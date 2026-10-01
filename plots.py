@@ -26,6 +26,7 @@ THEMES = {  # validated palette steps (dataviz reference palette), site surfaces
                  DAgger="#3987e5", PPO="#d95926", GRPO="#199e70"),
 }
 METHODS = ["DAgger", "PPO", "GRPO"]
+NAME = {"DAgger": "DAgger", "PPO": "Agreement PPO", "GRPO": "Agreement GRPO"}  # display names
 LW = 1.6  # ~2px
 
 
@@ -54,61 +55,99 @@ def save(fig, out):
     plt.close(fig)
 
 
-# ---------------------------------------------------------------- figure 1: the information-reveal environment
-def fig_env(c, out):
+# ---------------------------------------------------------------- summary: task success in the three settings
+def fig_summary(c, runs, distill, out, degree=1):
+    fig, (ax,) = new_fig(c, w=7.6, h=3.3)
+    style(ax, c)
+    ax.grid(axis="x", visible=False)
+    settings = ["privileged\ninformation", "hard-to-imitate\nexpert", f"limited capacity\n(student degree {degree})"]
+    values = {m: [100 * np.mean([r["success"] for r in runs if r["env"] == env and r["method"] == m])
+                  for env in ("reveal", "hard")] + [100 * distill["summary"][str(degree)][m]["success"][0]]
+              for m in METHODS}
+    x, width = np.arange(3), 0.26
+    for i, m in enumerate(METHODS):
+        bars = ax.bar(x + (i - 1) * width, values[m], width=width - 0.03, color=c[m], label=NAME[m], lw=0)
+        if m != "GRPO":  # label DAgger and Agreement PPO; the tables have the rest
+            for b, v in zip(bars, values[m]):
+                ax.annotate(f"{v:.1f}%", (b.get_x() + b.get_width() / 2, v), xytext=(0, 3), textcoords="offset points",
+                            ha="center", va="bottom", color=c["ink"], fontsize=9)
+    ax.set_xticks(x, settings)
+    ax.tick_params(axis="x", colors=c["ink"])
+    ax.set_ylim(0, 118)
+    ax.set_yticks([0, 25, 50, 75, 100])
+    ax.set_ylabel("task success (%)")
+    ax.legend(frameon=False, labelcolor=c["ink"], fontsize=9.5, loc="upper center", bbox_to_anchor=(0.5, 1.12), ncol=3)
+    fig.tight_layout()
+    save(fig, out)
+
+
+# ---------------------------------------------------------------- environment diagrams: a root and two branches
+def two_branch_diagram(c, out, root, up, down, up_label, down_label, middle, right):
     fig, (ax,) = new_fig(c, w=7.6, h=2.9)
     ax.set_axis_off()
     ax.set_xlim(0, 10)
     ax.set_ylim(0, 4)
 
-    def box(x, y, text, w=2.5, h=0.95):
+    def box(x, y, text, w, h=0.95):
         ax.add_patch(FancyBboxPatch((x - w / 2, y - h / 2), w, h, boxstyle="round,pad=0.02,rounding_size=0.12",
                                     fc="none", ec=c["ink2"], lw=1.1))
-        ax.text(x, y, text, ha="center", va="center", color=c["ink"], fontsize=10, linespacing=1.4)
+        ax.text(x, y, text, ha="center", va="center", color=c["ink"], fontsize=11, linespacing=1.4)
 
-    def arrow(x0, y0, x1, y1, text, color, dy):
-        ax.annotate("", (x1, y1), (x0, y0), arrowprops=dict(arrowstyle="-|>", color=color, lw=LW, shrinkA=0, shrinkB=0))
-        ax.text((x0 + x1) / 2, (y0 + y1) / 2 + dy, text, ha="center", va="center", color=c["ink"], fontsize=9.5)
+    def arrow(x0, y0, x1, y1, text, dy):
+        ax.annotate("", (x1, y1), (x0, y0), arrowprops=dict(arrowstyle="-|>", color=c["ink2"], lw=1.3, shrinkA=0,
+                                                            shrinkB=0))
+        ax.text((x0 + x1) / 2, (y0 + y1) / 2 + dy, text, ha="center", va="center", color=c["ink"], fontsize=10.5)
 
-    box(1.45, 2.0, "root\nhides z", w=2.0)
-    box(7.6, 3.15, "reveal-z  (8 steps)\nz is visible", w=3.6)
-    box(7.6, 0.85, "hidden  (8 steps)\nz still hidden", w=3.6)
-    arrow(2.5, 2.2, 5.75, 3.05, "action 1", c["PPO"], 0.35)
-    arrow(2.5, 1.8, 5.75, 0.95, "action 0", c["DAgger"], -0.35)
-    ax.text(4.1, 2.0, "either action matches\nthe expert with prob. 1/2", ha="center", va="center", color=c["ink2"],
-            fontsize=9, linespacing=1.3)
-    ax.text(7.6, 2.0, "expert plays a* = z at every step", ha="center", va="center", color=c["ink2"], fontsize=9)
+    box(1.35, 2.0, root, w=2.1)
+    box(7.45, 3.15, up, w=4.4)
+    box(7.45, 0.85, down, w=4.4)
+    arrow(2.45, 2.2, 5.2, 3.05, up_label, 0.35)
+    arrow(2.45, 1.8, 5.2, 0.95, down_label, -0.35)
+    ax.text(3.85, 2.0, middle, ha="center", va="center", color=c["ink2"], fontsize=9.5, linespacing=1.3)
+    ax.text(7.45, 2.0, right, ha="center", va="center", color=c["ink2"], fontsize=9.5, linespacing=1.3)
     fig.tight_layout(pad=0.2)
     save(fig, out)
 
 
-# ---------------------------------------------------------------- figure 2: the root decision during training
-def fig_root(c, runs, out):
-    fig, axes = new_fig(c, w=7.6, h=3.4, ncols=2)
-    titles = {"reveal": "(a) information reveal",
-              "hard": "(b) hard expert"}
-    for ax, env in zip(axes, ("reveal", "hard")):
-        style(ax, c)
-        for m in METHODS:
-            rs = [r for r in runs if r["env"] == env and r["method"] == m]
-            hist = np.array([[0.5] + r["root_history"] for r in rs])
-            x = np.arange(hist.shape[1]) * rs[0]["episodes_per_iter"] / 1000
-            ax.fill_between(x, hist.min(0), hist.max(0), color=c[m], alpha=0.25, lw=0)
-            ax.plot(x, hist.mean(0), color=c[m], lw=LW, label=m)
-            ax.annotate(f" {m}", (x[-1], hist.mean(0)[-1]), color=c["ink"], fontsize=9.5, va="center",
-                        xytext=(0, {"DAgger": 0, "PPO": 5, "GRPO": -5}[m] if env == "reveal" else 0),
-                        textcoords="offset points")
-        ax.set_ylim(0.45, 1.02)
-        ax.set_xlim(0, 400)
-        ax.set_xlabel("training episodes (thousands)")
-        ax.set_title(titles[env], color=c["ink"], fontsize=10, loc="left")
-    axes[0].set_ylabel("P(root action 1)")
-    axes[0].legend(frameon=False, labelcolor=c["ink"], fontsize=9.5, loc="center right", bbox_to_anchor=(1.0, 0.35))
+DIAGRAMS = {
+    "env": dict(root="root\nhides z", up="8 steps where z is visible", down="8 steps where z is still hidden",
+                up_label="action 1", down_label="action 0",
+                middle="either action matches\nthe expert half the time", right="the expert plays z at every step"),
+    "env-hard": dict(root="root\nhides z", up="z = 1: easy corridor\nz = 0: recoverable corridor",
+                     down="z = 0: easy corridor\nz = 1: hard corridor (coin flips)", up_label="action 1",
+                     down_label="action 0", middle="either action matches\nthe expert half the time",
+                     right="downstream, the expert plays 0\nexcept in the hard corridor"),
+    "env-distill": dict(root="root\n(nothing hidden)", up="other path: teacher plays 0\neasy for any student",
+                        down="teacher's path: plays parity of t\n1, 0, 1, 0, ...  needs degree 7",
+                        up_label="action 1", down_label="action 0",
+                        middle="the teacher\nplays 0 here", right="the student is a degree-k polynomial in t"),
+}
+
+
+# ---------------------------------------------------------------- the root decision during training
+def fig_root(c, runs, env, out):
+    fig, (ax,) = new_fig(c, w=7.6, h=3.2)
+    style(ax, c)
+    for m in METHODS:
+        rs = [r for r in runs if r["env"] == env and r["method"] == m]
+        hist = np.array([[0.5] + r["root_history"] for r in rs])
+        x = np.arange(hist.shape[1]) * rs[0]["episodes_per_iter"] / 1000
+        ax.fill_between(x, hist.min(0), hist.max(0), color=c[m], alpha=0.25, lw=0)
+        ax.plot(x, hist.mean(0), color=c[m], lw=LW, label=NAME[m])
+        ax.annotate(f" {NAME[m]}", (x[-1], hist.mean(0)[-1]), color=c["ink"], fontsize=9.5, va="center",
+                    xytext=(0, {"reveal": {"DAgger": 0, "PPO": 5, "GRPO": -6}, "hard": {"DAgger": 0, "PPO": 0, "GRPO": -9}}[env][m]),
+                    textcoords="offset points")
+    ax.set_ylim(0.45, 1.02)
+    ax.set_xlim(0, 500)
+    ax.set_xticks([0, 100, 200, 300, 400])
+    ax.set_xlabel("training episodes (thousands)")
+    ax.set_ylabel({"reveal": "P(revealing action)", "hard": "P(recoverable side)"}[env])
+    ax.legend(frameon=False, labelcolor=c["ink"], fontsize=9.5, loc="center right", bbox_to_anchor=(1.0, 0.4))
     fig.tight_layout()
     save(fig, out)
 
 
-# ---------------------------------------------------------------- figure 3: errors per episode, information reveal
+# ---------------------------------------------------------------- errors per episode, information reveal
 def error_dist(p1: list) -> np.ndarray:
     """Exact distribution of the number of expert disagreements in a 9-step reveal episode under policy p1."""
     dist = np.zeros(H + 2)
@@ -128,7 +167,7 @@ def fig_errors(c, runs, out):
     width = 0.27
     for i, m in enumerate(METHODS):
         d = np.mean([error_dist(r["policy"]) for r in runs if r["env"] == "reveal" and r["method"] == m], 0)
-        ax.bar(k + (i - 1) * width, d, width=width - 0.04, color=c[m], label=m, lw=0)
+        ax.bar(k + (i - 1) * width, d, width=width - 0.04, color=c[m], label=NAME[m], lw=0)
     ax.axvspan(-0.5, 2.5, color=c["grid"], alpha=0.45, lw=0, zorder=0)
     ax.text(1.0, 0.62, "success: ≤ 2 errors", ha="center", color=c["ink2"], fontsize=9.5)
     ax.set_xticks(k)
@@ -142,7 +181,7 @@ def fig_errors(c, runs, out):
     save(fig, out)
 
 
-# ---------------------------------------------------------------- figure 4: distillation, deterministic teacher
+# ---------------------------------------------------------------- distillation, deterministic teacher
 def fig_distill(c, data, out):
     fig, (ax,) = new_fig(c, w=7.6, h=3.4)
     style(ax, c)
@@ -153,21 +192,21 @@ def fig_distill(c, data, out):
     ax.annotate("leaving the teacher's path: 1 error", (0.05, 0.7), color=c["ink2"], fontsize=9)
     for m in METHODS:
         mu = [data["summary"][str(k)][m]["errors"][0] for k in ks]
-        ax.plot(ks, mu, color=c[m], lw=LW, marker="o", ms=5, label=m)
+        ax.plot(ks, mu, color=c[m], lw=LW, marker="o", ms=5, label=NAME[m])
     ax.set_xticks(ks)
     ax.set_ylim(-0.15, 4.4)
     ax.set_xlabel("student size: polynomial degree k (the teacher needs 7)")
     ax.set_ylabel("disagreements per episode")
-    ax.legend(frameon=False, labelcolor=c["ink"], fontsize=9.5, loc="upper right", bbox_to_anchor=(1.0, 0.82))
+    ax.legend(frameon=False, labelcolor=c["ink"], fontsize=9.5, loc="upper right", bbox_to_anchor=(1.0, 1.02))
     fig.tight_layout()
     save(fig, out)
 
 
-# ---------------------------------------------------------------- figure 5: distillation, stochastic teacher
+# ---------------------------------------------------------------- distillation, stochastic teacher
 SOFT = [("forward KL", "on-policy forward KL", "DAgger", "-", "o"),
         ("reverse KL (γ=0)", "reverse KL, discount 0", "DAgger", (0, (4, 2)), "s"),
         ("reverse KL", "reverse KL with returns", "PPO", (0, (4, 2)), "s"),
-        ("±1 agreement", "±1 agreement (PPO)", "PPO", "-", "o")]
+        ("±1 agreement", "Agreement PPO", "PPO", "-", "o")]
 
 
 def fig_distill_soft(c, data, out):
@@ -183,10 +222,10 @@ def fig_distill_soft(c, data, out):
         ax.set_xlabel("student degree k")
         ax.set_title(title, color=c["ink"], fontsize=10, loc="left")
     axes[0].axhline(0.1, color=c["ref"], lw=0.9, ls=(0, (1, 2)))
-    axes[0].annotate("teacher: 0.1", (0.0, 0.14), color=c["ink2"], fontsize=9)
+    axes[0].annotate("teacher: 0.1", (5.0, 0.135), color=c["ink2"], fontsize=9)
     axes[0].set_ylim(0, 1.05)
     axes[1].set_ylim(0, 4.0)
-    axes[1].legend(frameon=False, labelcolor=c["ink"], fontsize=8.5, loc="lower left")
+    axes[0].legend(frameon=False, labelcolor=c["ink"], fontsize=8.5, loc="center left", bbox_to_anchor=(0.0, 0.33))
     fig.tight_layout()
     save(fig, out)
 
@@ -197,9 +236,14 @@ if __name__ == "__main__":
     distill_soft = json.load(open("results/distill_stochastic.json"))
     out = Path("figures")
     out.mkdir(exist_ok=True)
+    for f in out.glob("*.svg"):
+        f.unlink()
     for theme, c in THEMES.items():
-        fig_env(c, out / f"env-{theme}.svg")
-        fig_root(c, runs, out / f"root-{theme}.svg")
+        fig_summary(c, runs, distill, out / f"summary-{theme}.svg")
+        for name, kw in DIAGRAMS.items():
+            two_branch_diagram(c, out / f"{name}-{theme}.svg", **kw)
+        fig_root(c, runs, "reveal", out / f"root-{theme}.svg")
+        fig_root(c, runs, "hard", out / f"root-hard-{theme}.svg")
         fig_errors(c, runs, out / f"errors-{theme}.svg")
         fig_distill(c, distill, out / f"distill-{theme}.svg")
         fig_distill_soft(c, distill_soft, out / f"distill-soft-{theme}.svg")

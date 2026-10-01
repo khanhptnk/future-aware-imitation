@@ -1498,16 +1498,16 @@ z
    </g>
    <g id="legend_1">
     <g id="patch_36">
-     <path d="M 469.33 28.204 
-L 488.33 28.204 
-L 488.33 21.554 
-L 469.33 21.554 
+     <path d="M 426.77 28.204 
+L 445.77 28.204 
+L 445.77 21.554 
+L 426.77 21.554 
 z
 " style="fill: #3987e5"/>
     </g>
     <g id="text_21">
      <!-- DAgger -->
-     <g style="fill: #ebebec" transform="translate(495.93 28.204) scale(0.095 -0.095)">
+     <g style="fill: #ebebec" transform="translate(453.37 28.204) scale(0.095 -0.095)">
       <defs>
        <path id="UbuntuMono-Regular-27" d="M 1267 -32 
 Q 1056 -32 832 -3 
@@ -1571,16 +1571,16 @@ z
      </g>
     </g>
     <g id="patch_37">
-     <path d="M 469.33 43.6035 
-L 488.33 43.6035 
-L 488.33 36.9535 
-L 469.33 36.9535 
+     <path d="M 426.77 43.6035 
+L 445.77 43.6035 
+L 445.77 36.9535 
+L 426.77 36.9535 
 z
 " style="fill: #d95926"/>
     </g>
     <g id="text_22">
-     <!-- PPO -->
-     <g style="fill: #ebebec" transform="translate(495.93 43.6035) scale(0.095 -0.095)">
+     <!-- Agreement PPO -->
+     <g style="fill: #ebebec" transform="translate(453.37 43.6035) scale(0.095 -0.095)">
       <defs>
        <path id="UbuntuMono-Regular-33" d="M 570 0 
 L 570 4371 
@@ -1637,22 +1637,32 @@ Q 1440 339 1773 339
 z
 " transform="scale(0.015625)"/>
       </defs>
-      <use xlink:href="#UbuntuMono-Regular-33"/>
-      <use xlink:href="#UbuntuMono-Regular-33" transform="translate(56 0)"/>
-      <use xlink:href="#UbuntuMono-Regular-32" transform="translate(112 0)"/>
+      <use xlink:href="#UbuntuMono-Regular-24"/>
+      <use xlink:href="#UbuntuMono-Regular-4a" transform="translate(56 0)"/>
+      <use xlink:href="#UbuntuMono-Regular-55" transform="translate(112 0)"/>
+      <use xlink:href="#UbuntuMono-Regular-48" transform="translate(168 0)"/>
+      <use xlink:href="#UbuntuMono-Regular-48" transform="translate(224 0)"/>
+      <use xlink:href="#UbuntuMono-Regular-50" transform="translate(280 0)"/>
+      <use xlink:href="#UbuntuMono-Regular-48" transform="translate(336 0)"/>
+      <use xlink:href="#UbuntuMono-Regular-51" transform="translate(392 0)"/>
+      <use xlink:href="#UbuntuMono-Regular-57" transform="translate(448 0)"/>
+      <use xlink:href="#UbuntuMono-Regular-3" transform="translate(504 0)"/>
+      <use xlink:href="#UbuntuMono-Regular-33" transform="translate(560 0)"/>
+      <use xlink:href="#UbuntuMono-Regular-33" transform="translate(616 0)"/>
+      <use xlink:href="#UbuntuMono-Regular-32" transform="translate(672 0)"/>
      </g>
     </g>
     <g id="patch_38">
-     <path d="M 469.33 59.003 
-L 488.33 59.003 
-L 488.33 52.353 
-L 469.33 52.353 
+     <path d="M 426.77 59.003 
+L 445.77 59.003 
+L 445.77 52.353 
+L 426.77 52.353 
 z
 " style="fill: #199e70"/>
     </g>
     <g id="text_23">
-     <!-- GRPO -->
-     <g style="fill: #ebebec" transform="translate(495.93 59.003) scale(0.095 -0.095)">
+     <!-- Agreement GRPO -->
+     <g style="fill: #ebebec" transform="translate(453.37 59.003) scale(0.095 -0.095)">
       <defs>
        <path id="UbuntuMono-Regular-2a" d="M 2144 -96 
 Q 1619 -96 1222 179 
@@ -1718,10 +1728,20 @@ L 909 2195
 z
 " transform="scale(0.015625)"/>
       </defs>
-      <use xlink:href="#UbuntuMono-Regular-2a"/>
-      <use xlink:href="#UbuntuMono-Regular-35" transform="translate(56 0)"/>
-      <use xlink:href="#UbuntuMono-Regular-33" transform="translate(112 0)"/>
-      <use xlink:href="#UbuntuMono-Regular-32" transform="translate(168 0)"/>
+      <use xlink:href="#UbuntuMono-Regular-24"/>
+      <use xlink:href="#UbuntuMono-Regular-4a" transform="translate(56 0)"/>
+      <use xlink:href="#UbuntuMono-Regular-55" transform="translate(112 0)"/>
+      <use xlink:href="#UbuntuMono-Regular-48" transform="translate(168 0)"/>
+      <use xlink:href="#UbuntuMono-Regular-48" transform="translate(224 0)"/>
+      <use xlink:href="#UbuntuMono-Regular-50" transform="translate(280 0)"/>
+      <use xlink:href="#UbuntuMono-Regular-48" transform="translate(336 0)"/>
+      <use xlink:href="#UbuntuMono-Regular-51" transform="translate(392 0)"/>
+      <use xlink:href="#UbuntuMono-Regular-57" transform="translate(448 0)"/>
+      <use xlink:href="#UbuntuMono-Regular-3" transform="translate(504 0)"/>
+      <use xlink:href="#UbuntuMono-Regular-2a" transform="translate(560 0)"/>
+      <use xlink:href="#UbuntuMono-Regular-35" transform="translate(616 0)"/>
+      <use xlink:href="#UbuntuMono-Regular-33" transform="translate(672 0)"/>
+      <use xlink:href="#UbuntuMono-Regular-32" transform="translate(728 0)"/>
      </g>
     </g>
    </g>

@@ -1,0 +1,12 @@
+[project]
+name = "future-aware-imitation"
+version = "0.1.0"
+description = "Experiments for the post on when immediate imitation is not enough: DAgger vs PPO and GRPO on toy POMDPs"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.26",
+    "matplotlib>=3.8",
+]
+
+[tool.uv]
+package = false

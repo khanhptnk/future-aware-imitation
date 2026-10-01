@@ -2,11 +2,14 @@
 
 Code for the post [When immediate imitation is not enough](https://khanhptnk.github.io/machine-learning/future-aware-imitation):
 two toy POMDPs where some imitation error is unavoidable, and where DAgger, PPO and a GRPO-style update learn to make
-different mistakes. Everything runs on a CPU in under a minute with NumPy.
+different mistakes, plus a distillation version where the student is too small to follow the teacher. Everything runs
+on a CPU in a few minutes with NumPy.
 
 ```sh
-uv run reproduce.py   # ~1 min: 3 methods x 2 environments x 12 seeds; writes results/runs.json, results/summary.json
-uv run plots.py       # figures/*.svg (light and dark versions) from results/runs.json
+uv run reproduce.py            # ~1 min: 3 methods x 2 environments x 12 seeds; writes results/runs.json, summary.json
+uv run distill.py              # ~2 min: deterministic teacher, student degree 0-7; writes results/distill.json
+uv run distill_stochastic.py   # ~3 min: stochastic teacher, 4 distillation objectives; results/distill_stochastic.json
+uv run plots.py                # figures/*.svg (light and dark versions) from results/*.json
 ```
 
 `results/` holds the JSON from the run behind the post, so `plots.py` works without re-running anything.
@@ -42,6 +45,39 @@ leads to a future the learner can imitate.
 | GRPO | 0.902 ± 0.003 | 6.83 ± 0.02 | 1.085 ± 0.008 | 92.9% ± 0.2% |
 
 DAgger's numbers have closed forms: 54.49% success (reveal) and 75.88% (hard expert).
+
+## Distillation into a smaller student
+
+`distill.py` and `distill_stochastic.py`. Nothing is hidden: the state is (branch, t). The teacher plays 0 at the root,
+so its own path is branch 0, where it plays the parity of t; in branch 1 it plays 0. The student has a root logit and,
+per branch, a logistic policy whose logit is a degree-k polynomial in t (Legendre features). Degree 7 fits the teacher
+exactly; a smaller student makes at least ceil((7 − k) / 2) errors on the teacher's path, while leaving it at the root
+costs one error.
+
+**Deterministic teacher** (mean errors per episode, 12 seeds):
+
+| Student degree k | 0 | 1–2 | 3–4 | 5–6 | 7 |
+|---|---|---|---|---|---|
+| DAgger | 4.00 | 3.82 | 3.37 | 2.46 | **0.00** |
+| PPO | 1.01 | 1.01 | 1.01 | 1.01 | 0.95 |
+| GRPO | 1.07 | 1.07 | 1.06 | 1.05 | 1.04 |
+
+DAgger always follows the teacher (P(leave) = 0); PPO and GRPO leave its path in 98–99.8% of episodes below k = 7.
+
+**Stochastic teacher** (0.9 on the action above in every state). Four objectives on the student's own roll-outs:
+on-policy forward KL (DAgger with soft labels), per-token reverse KL with discount 0, reverse KL with returns
+(sequence-level reverse KL), and ±1 agreement with PPO. Evaluation is exact (all 512 action sequences). At k = 1:
+
+| Objective | P(leave) | Errors | Success | KL(P_S ‖ P_T) | KL(P_T ‖ P_S) |
+|---|---|---|---|---|---|
+| teacher | 0.10 | 0.90 | 94.7% | 0 | 0 |
+| forward KL | 0.100 | 3.64 | 23.1% | 3.49 | 2.54 |
+| reverse KL, γ = 0 | 0.103 | 3.61 | 23.7% | 3.47 | 2.55 |
+| reverse KL, returns | 0.840 | 2.12 | 71.1% | 2.13 | 3.90 |
+| ±1 agreement | 0.998 | 1.01 | 99.8% | 3.11 | 14.2 |
+
+At k = 0 the exact optimum of the sequence-level reverse KL leaves with probability 0.869 at 2.162 nats; reverse KL
+with returns reaches 0.866 and 2.162.
 
 ## Training details
 

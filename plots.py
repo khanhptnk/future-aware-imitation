@@ -1,6 +1,6 @@
-"""Figures for the post, each rendered twice (light and dark theme) as SVG, from results/runs.json.
+"""Figures for the post, each rendered twice (light and dark theme) as SVG, from the JSON files in results/.
 
-Run: uv run plots.py        (after reproduce.py; writes figures/*.svg)
+Run: uv run plots.py        (after reproduce.py, distill.py, distill_stochastic.py; writes figures/*.svg)
 """
 import json
 from math import comb
@@ -50,7 +50,7 @@ def new_fig(c, w=7.6, h=3.6, ncols=1):
 
 
 def save(fig, out):
-    fig.savefig(out, format="svg", transparent=True)
+    fig.savefig(out, format="svg", transparent=True, metadata={"Date": None})  # no timestamp: reruns are byte-identical
     plt.close(fig)
 
 
@@ -142,12 +142,65 @@ def fig_errors(c, runs, out):
     save(fig, out)
 
 
+# ---------------------------------------------------------------- figure 4: distillation, deterministic teacher
+def fig_distill(c, data, out):
+    fig, (ax,) = new_fig(c, w=7.6, h=3.4)
+    style(ax, c)
+    ks = sorted(int(k) for k in data["summary"])
+    ax.step(ks, [np.ceil((7 - k) / 2) for k in ks], where="mid", color=c["ref"], lw=1.1, ls=(0, (1, 2)))
+    ax.annotate("fewest errors possible\nwhen copying the teacher", (2.55, 2.12), color=c["ink2"], fontsize=9)
+    ax.axhline(1, color=c["ref"], lw=1.0, ls=(0, (4, 3)))
+    ax.annotate("leaving the teacher's path: 1 error", (0.05, 0.7), color=c["ink2"], fontsize=9)
+    for m in METHODS:
+        mu = [data["summary"][str(k)][m]["errors"][0] for k in ks]
+        ax.plot(ks, mu, color=c[m], lw=LW, marker="o", ms=5, label=m)
+    ax.set_xticks(ks)
+    ax.set_ylim(-0.15, 4.4)
+    ax.set_xlabel("student size: polynomial degree k (the teacher needs 7)")
+    ax.set_ylabel("disagreements per episode")
+    ax.legend(frameon=False, labelcolor=c["ink"], fontsize=9.5, loc="upper right", bbox_to_anchor=(1.0, 0.82))
+    fig.tight_layout()
+    save(fig, out)
+
+
+# ---------------------------------------------------------------- figure 5: distillation, stochastic teacher
+SOFT = [("forward KL", "on-policy forward KL", "DAgger", "-", "o"),
+        ("reverse KL (γ=0)", "reverse KL, discount 0", "DAgger", (0, (4, 2)), "s"),
+        ("reverse KL", "reverse KL with returns", "PPO", (0, (4, 2)), "s"),
+        ("±1 agreement", "±1 agreement (PPO)", "PPO", "-", "o")]
+
+
+def fig_distill_soft(c, data, out):
+    fig, axes = new_fig(c, w=7.6, h=3.5, ncols=2)
+    ks = sorted(int(k) for k in data["summary"])
+    for ax, key, title in ((axes[0], "p_deviate", "(a) P(leave the teacher's path)"),
+                           (axes[1], "errors", "(b) disagreements per episode")):
+        style(ax, c)
+        for name, lab, col, ls, mk in SOFT:
+            ax.plot(ks, [data["summary"][str(k)][name][key][0] for k in ks], color=c[col], lw=LW, ls=ls,
+                    marker=mk, ms=4.5, label=lab)
+        ax.set_xticks(ks)
+        ax.set_xlabel("student degree k")
+        ax.set_title(title, color=c["ink"], fontsize=10, loc="left")
+    axes[0].axhline(0.1, color=c["ref"], lw=0.9, ls=(0, (1, 2)))
+    axes[0].annotate("teacher: 0.1", (0.0, 0.14), color=c["ink2"], fontsize=9)
+    axes[0].set_ylim(0, 1.05)
+    axes[1].set_ylim(0, 4.0)
+    axes[1].legend(frameon=False, labelcolor=c["ink"], fontsize=8.5, loc="lower left")
+    fig.tight_layout()
+    save(fig, out)
+
+
 if __name__ == "__main__":
     runs = json.load(open("results/runs.json"))
+    distill = json.load(open("results/distill.json"))
+    distill_soft = json.load(open("results/distill_stochastic.json"))
     out = Path("figures")
     out.mkdir(exist_ok=True)
     for theme, c in THEMES.items():
         fig_env(c, out / f"env-{theme}.svg")
         fig_root(c, runs, out / f"root-{theme}.svg")
         fig_errors(c, runs, out / f"errors-{theme}.svg")
+        fig_distill(c, distill, out / f"distill-{theme}.svg")
+        fig_distill_soft(c, distill_soft, out / f"distill-soft-{theme}.svg")
     print("wrote", sorted(p.name for p in out.glob("*.svg")))

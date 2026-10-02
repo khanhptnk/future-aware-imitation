@@ -5,7 +5,8 @@ toy environments for three reasons imitation can be impossible (privileged infor
 limited capacity), and how DAgger, AggreVaTe, LOLS and **Agreement PPO (APPO)** handle them.
 
 APPO is PPO on the learner's own roll-outs with a reward of +1 when its action matches the expert's and −1 otherwise,
-credited with undiscounted returns. AGRPO is the same reward with a minimal GRPO-style update. Everything is NumPy and
+credited with undiscounted returns, with no entropy bonus or KL term. AGRPO is the same reward with a minimal GRPO-style
+update; it behaves like APPO and isn't shown in the post. Everything is NumPy and
 runs on a CPU.
 
 The idea in one line: when the learner can't represent the expert, the optimal policy (the expert) and the learner's
@@ -16,6 +17,7 @@ learner's best policy, because they score actions by the learner's own future.
 uv run reproduce.py            # ~10 min: cases 1 and 2, five methods, tuned; results/runs.json, results/tuning.json
 uv run distill.py              # ~20 min: case 3, deterministic teacher, student degree 0-7; results/distill.json
 uv run distill_stochastic.py   # ~30 min: case 3, stochastic teacher, six distillation objectives; results/distill_stochastic.json
+uv run entropy_ablation.py     # ~10 min: APPO with an entropy bonus, swept; results/entropy.json
 uv run plots.py                # figures/*.svg (light and dark versions) from results/*.json
 uv run reproduce.py --note     # the original note's settings, which reproduce its tables
 ```
@@ -91,6 +93,15 @@ The per-token objectives follow the teacher at the root; reverse KL with discoun
 convergence (reverse KL ≈ 3.48), but scores best when stopped partway, so its tuned step size is small. The objectives with
 returns leave the teacher's path. At k = 0, reverse KL with returns reaches the exact optimum of the sequence-level reverse
 KL (leave 0.869 at 2.162 nats; training: 0.866 and 2.162).
+
+## Entropy bonus (`entropy_ablation.py`)
+
+APPO has no entropy bonus. Adding one, swept from 0.003 to 1 at APPO's tuned learning rate, leaves its root decisions
+essentially unchanged up to 0.3; larger coefficients only make the policy noisier. With the stochastic teacher it trades
+errors for KL but stays far from the distribution-matching objectives. With the stochastic teacher at degree 7, for example,
+a coefficient of 0.3 lowers APPO's forward KL from 5.26 to 3.45 nats and raises its errors from 0.06 to 0.14, while
+reverse KL with returns reaches 0.02. With a degree-1 student the bonus has no effect: the logits saturate within a few
+iterations at the tuned learning rate, where the entropy gradient vanishes.
 
 ## License
 

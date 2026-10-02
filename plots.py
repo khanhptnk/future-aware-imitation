@@ -25,7 +25,7 @@ THEMES = {  # validated palette steps (keys DAgger / PPO / GRPO name the three c
     "dark": dict(surface="#161618", ink="#ebebec", ink2="#c3c2b7", grid="#393639", ref="#a3a29a",
                  DAgger="#3987e5", PPO="#d95926", GRPO="#199e70"),
 }
-METHODS = ["DAgger", "AggreVaTe", "LOLS", "APPO", "AGRPO"]
+METHODS = ["DAgger", "AggreVaTe", "LOLS", "APPO"]  # AGRPO is in the results but not plotted
 # Composite encoding: color = whose future gets credited (blue: none beyond the current step, or the expert's;
 # orange: the learner's; aqua: AGRPO), line style / hatch = which algorithm within that family.
 STYLE = {"DAgger": ("DAgger", "-", "o", None), "AggreVaTe": ("DAgger", (0, (4, 2)), "s", "////"),
@@ -150,7 +150,7 @@ def fig_root(c, runs, env, out):
         rs = [r for r in runs if r["env"] == env and r["method"] == m]
         hist = np.array([[0.5] + r["history"] for r in rs])
         x = np.arange(hist.shape[1]) * rs[0]["episodes_per_iter"] / 1000
-        if m in ("APPO", "AGRPO", "DAgger"):
+        if m in ("APPO", "DAgger"):
             ax.fill_between(x, hist.min(0), hist.max(0), color=c[STYLE[m][0]], alpha=0.2, lw=0)
         line(ax, x, hist.mean(0), m, c)
     ax.set_ylim(-0.03, 1.05)

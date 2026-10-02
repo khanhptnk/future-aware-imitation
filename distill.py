@@ -157,9 +157,10 @@ def lols(student, rng, beta=0.0, iters=40, episodes=3000):
     return p1, []
 
 
-def clipped_update(student, theta, states, act, adv, lr, eps, epochs):
-    """As in reproduce.py: each state's logit gets the mean clipped-surrogate gradient over its samples, then the chain
-    rule through the features (with one-hot features this is exactly the tabular update)."""
+def clipped_update(student, theta, states, act, adv, lr, eps, epochs, ent=0.0):
+    """As in reproduce.py: each state's logit gets the mean clipped-surrogate gradient over its samples (plus, with
+    ent > 0, the entropy bonus at every visited state), then the chain rule through the features (with one-hot features
+    this is exactly the tabular update)."""
     s, a, adv = states.ravel(), act.ravel(), adv.ravel()
     count = np.maximum(np.bincount(s, minlength=N_STATES), 1)
     p_old = student.probs(theta)[s]
@@ -169,11 +170,13 @@ def clipped_update(student, theta, states, act, adv, lr, eps, epochs):
         ratio = np.where(a == 1, p, 1 - p) / pi_old
         active = ~(((adv > 0) & (ratio > 1 + eps)) | ((adv < 0) & (ratio < 1 - eps)))
         g_state = np.bincount(s, weights=active * adv * ratio * (a - p), minlength=N_STATES) / count
+        z = student.phi @ theta
+        g_state = g_state + ent * -z * sigmoid(z) * (1 - sigmoid(z)) * (np.bincount(s, minlength=N_STATES) > 0)
         theta = theta + lr * student.phi.T @ g_state
     return theta
 
 
-def ppo(student, rng, iters=120, episodes=3072, lr=0.065, eps=0.2, epochs=4):
+def ppo(student, rng, iters=120, episodes=3072, lr=0.065, eps=0.2, epochs=4, ent=0.0):
     theta = np.zeros(student.n_params)
     for _ in range(iters):
         states, act, _, rew = rollout(student.probs(theta), episodes, rng)
@@ -181,7 +184,7 @@ def ppo(student, rng, iters=120, episodes=3072, lr=0.065, eps=0.2, epochs=4):
         n = np.bincount(states.ravel(), minlength=N_STATES)
         adv = G - (np.bincount(states.ravel(), weights=G.ravel(), minlength=N_STATES) / np.maximum(n, 1))[states]
         adv = adv / (adv.std() + 1e-8)
-        theta = clipped_update(student, theta, states, act, adv, lr, eps, epochs)
+        theta = clipped_update(student, theta, states, act, adv, lr, eps, epochs, ent)
     return student.probs(theta), []
 
 

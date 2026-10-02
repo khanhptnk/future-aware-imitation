@@ -154,9 +154,10 @@ def lols(env: Env, rng, beta=0.0, iters=40, episodes=3000):
     return p1, history
 
 
-def clipped_update(theta, obs, act, adv, lr, eps, epochs):
+def clipped_update(theta, obs, act, adv, lr, eps, epochs, ent=0.0):
     """Full-batch gradient ascent on the PPO clipped surrogate. Each observation's logit gets the mean gradient over the
-    samples at that observation (the normalization that reproduces the note's numbers)."""
+    samples at that observation (the normalization that reproduces the note's numbers). With ent > 0, an entropy bonus:
+    each visited observation's logit also gets ent * dH/dlogit, which is -logit * p (1 - p) for a Bernoulli policy."""
     obs, act, adv = obs.ravel(), act.ravel(), adv.ravel()
     count = np.maximum(np.bincount(obs, minlength=len(theta)), 1)
     p_old = sigmoid(theta[obs])
@@ -166,7 +167,8 @@ def clipped_update(theta, obs, act, adv, lr, eps, epochs):
         ratio = np.where(act == 1, p, 1 - p) / pi_old
         active = ~(((adv > 0) & (ratio > 1 + eps)) | ((adv < 0) & (ratio < 1 - eps)))  # clipped samples: no gradient
         g = active * adv * ratio * (act - p)  # d/dlogit of ratio * A = ratio * A * (a - p)
-        theta = theta + lr * np.bincount(obs, weights=g, minlength=len(theta)) / count
+        g_ent = ent * -theta * sigmoid(theta) * (1 - sigmoid(theta)) * (np.bincount(obs, minlength=len(theta)) > 0)
+        theta = theta + lr * (np.bincount(obs, weights=g, minlength=len(theta)) / count + g_ent)
     return theta
 
 
@@ -174,7 +176,7 @@ def returns_to_go(rew):
     return np.flip(np.cumsum(np.flip(rew, 1), 1), 1)
 
 
-def ppo(env: Env, rng, iters=120, episodes=3072, lr=0.065, eps=0.2, epochs=4):
+def ppo(env: Env, rng, iters=120, episodes=3072, lr=0.065, eps=0.2, epochs=4, ent=0.0):
     """No value network: the baseline for each sample is the batch-mean return-to-go of samples with the same
     observation, then all advantages are divided by their global standard deviation."""
     theta = np.zeros(env.n_obs)
@@ -186,7 +188,7 @@ def ppo(env: Env, rng, iters=120, episodes=3072, lr=0.065, eps=0.2, epochs=4):
         baseline = np.bincount(obs.ravel(), weights=G.ravel(), minlength=env.n_obs) / np.maximum(n, 1)
         adv = G - baseline[obs]
         adv = adv / (adv.std() + 1e-8)
-        theta = clipped_update(theta, obs, act, adv, lr, eps, epochs)
+        theta = clipped_update(theta, obs, act, adv, lr, eps, epochs, ent)
         history.append(sigmoid(theta[0]))
     return sigmoid(theta), history
 

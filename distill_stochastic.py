@@ -52,14 +52,15 @@ def evaluate(student, p1: np.ndarray, seed=None) -> dict:
         q = q1[_STATES]
         return np.log(np.where(_SEQS == 1, q, 1 - q)).sum(1)
 
-    log_s, log_t = logprob(np.asarray(p1)), logprob(TEACHER_P1)
+    with np.errstate(divide="ignore", invalid="ignore"):  # a saturated student can give sequences probability 0
+        log_s, log_t = logprob(np.asarray(p1)), logprob(TEACHER_P1)
     P_s, P_t = np.exp(log_s), np.exp(log_t)
     errors = (_SEQS != TEACHER[_STATES]).sum(1)
     return {
         "p_deviate": float(p1[0]),
         "errors": float(P_s @ errors),
         "success": float(P_s @ (errors <= 2)),
-        "reverse_kl": float(P_s @ (log_s - log_t)),
+        "reverse_kl": float(np.where(P_s > 0, P_s * np.nan_to_num(log_s - log_t), 0.0).sum()),  # 0 log 0 = 0
         "forward_kl": float(P_t @ (log_t - log_s)),
     }
 
@@ -108,7 +109,7 @@ def jsd(student, rng, iters=120, episodes=EPISODES, beta=0.5, steps=60, lr=0.1):
     return student.probs(theta), []
 
 
-def rl(student, rng, reward, use_returns, iters=120, episodes=EPISODES, lr=0.065, eps=0.2, epochs=4):
+def rl(student, rng, reward, use_returns, iters=120, episodes=EPISODES, lr=0.065, eps=0.2, epochs=4, ent=0.0):
     """PPO pipeline of distill.ppo with a choice of per-step reward and of returns vs. each step's own reward."""
     theta = np.zeros(student.n_params)
     for _ in range(iters):
@@ -123,7 +124,7 @@ def rl(student, rng, reward, use_returns, iters=120, episodes=EPISODES, lr=0.065
         n = np.bincount(states.ravel(), minlength=N_STATES)
         adv = G - (np.bincount(states.ravel(), weights=G.ravel(), minlength=N_STATES) / np.maximum(n, 1))[states]
         adv = adv / (adv.std() + 1e-8)
-        theta = clipped_update(student, theta, states, act, adv, lr, eps, epochs)
+        theta = clipped_update(student, theta, states, act, adv, lr, eps, epochs, ent)
     return student.probs(theta), []
 
 

@@ -1,4 +1,5 @@
-"""Distillation into a smaller student: DAgger vs PPO vs GRPO when the student can't represent the teacher.
+"""Distillation into a smaller student: DAgger, AggreVaTe, LOLS, APPO and AGRPO when the student can't represent the
+teacher.
 
 The student sees everything the teacher sees. The only gap is model size. Each episode has a root decision and then
 H = 8 steps in one of two branches, chosen by the root action. The state is (branch, t), fully observed.
@@ -10,22 +11,23 @@ H = 8 steps in one of two branches, chosen by the root action. The state is (bra
            so in branch 0 it makes at least ceil((7 - k) / 2) errors; branch 1 it fits for any k.
 
 Copying the teacher at the root is free now but costs those errors later; deviating (root action 1) costs one error now
-and none later. DAgger's root label is always 0, so it always copies.
+and none later. DAgger's root label is always 0, and AggreVaTe's teacher roll-outs value both root actions at the
+teacher's 8 later agreements (plus +1 / -1 at the root), so both always copy. LOLS and APPO value the root actions by
+the student's own later agreement, so they leave whenever the student can't fit branch 0.
 
-Run: uv run distill.py        (CPU, a few minutes; writes results/distill.json)
+Run: uv run distill.py        (CPU, ~20 min: tunes and reports at every student size; writes results/distill.json)
 """
 
 import json
-import time
 from pathlib import Path
 
 import numpy as np
 from numpy.polynomial import legendre
 
-from reproduce import H, T, returns_to_go, sigmoid
+from protocol import EPISODES, Method, summarize, tune_and_report
+from reproduce import H, LR_GRID, T, explore, returns_to_go, sigmoid
 
 DEGREES = range(8)
-SEEDS = range(12)
 EVAL_EPISODES = 50_000
 N_STATES = 1 + 2 * H  # 0: root; 1..8: branch 0 at t = 1..8; 9..16: branch 1
 TEACHER = np.array([0] + [t % 2 for t in range(1, H + 1)] + [0] * H)  # teacher's action in each state
@@ -58,12 +60,16 @@ def rollout(p1: np.ndarray, n: int, rng: np.random.Generator):
     return states, act, teacher, np.where(act == teacher, 1.0, -1.0)
 
 
-def evaluate(p1, seed):
-    rng = np.random.default_rng(9000 + seed)
-    _, _, _, rew = rollout(p1, EVAL_EPISODES, rng)
-    errors = (rew < 0).sum(1)
-    return {"p_deviate": float(p1[0]), "signed_return": float(rew.sum(1).mean()), "errors": float(errors.mean()),
-            "success": float((errors <= 2).mean())}
+def evaluate(student, p1, seed):
+    """Metrics of the policy as trained (actions sampled) and played greedily, on the same 50,000 fresh episodes."""
+    out = {"p_deviate": float(p1[0])}
+    for prefix, policy in (("", p1), ("greedy_", (np.asarray(p1) > 0.5).astype(float))):
+        rng = np.random.default_rng(9000 + seed)
+        _, _, _, rew = rollout(policy, EVAL_EPISODES, rng)
+        errors = (rew < 0).sum(1)
+        out |= {prefix + "signed_return": float(rew.sum(1).mean()), prefix + "errors": float(errors.mean()),
+                prefix + "success": float((errors <= 2).mean())}
+    return out
 
 
 def fit_logistic(student, n1, n, theta, iters=50, ridge=1e-6):
@@ -94,7 +100,61 @@ def dagger(student, rng, iters=40, episodes=3000, pseudocount=1e-3):
         np.add.at(n1, states.ravel(), teacher.ravel())
         np.add.at(n, states.ravel(), 1)
         theta = fit_logistic(student, n1, n, theta)
-    return student.probs(theta)
+    return student.probs(theta), []
+
+
+def fit_cost_sensitive(student, q_sum, q_n, theta, pseudocount=1e-3):
+    """The cost-sensitive classifier for the student's class. A binary cost-sensitive problem is a weighted
+    classification problem (label = the action with the higher mean value, weight = samples x the value gap); fit it
+    with the logistic loss and play it deterministically. Returns the new parameters and the policy."""
+    mean = q_sum / np.maximum(q_n, 1)
+    gap = np.where((q_n > 0).all(1), mean[:, 1] - mean[:, 0], 0.0)
+    w = q_n.sum(1) * np.abs(gap)
+    theta = fit_logistic(student, w * (gap > 0) + pseudocount, w + 2 * pseudocount, theta)
+    return theta, (student.phi @ theta > 0).astype(float)
+
+
+def aggrevate(student, rng, iters=40, episodes=3000):
+    """AggreVaTe with learner roll-in (see reproduce.explore): one random action at one random step per episode, then
+    the teacher finishes the episode."""
+    q_sum, q_n = np.zeros((N_STATES, 2)), np.zeros((N_STATES, 2))
+    theta, p1 = np.zeros(student.n_params), np.full(N_STATES, 0.5)
+    for _ in range(iters):
+        states, _, teacher, _ = rollout(p1, episodes, rng)
+        s, a, q = explore(states, teacher, rng)
+        np.add.at(q_sum, (s, a), q)
+        np.add.at(q_n, (s, a), 1)
+        theta, p1 = fit_cost_sensitive(student, q_sum, q_n, theta)
+    return p1, []
+
+
+def continue_from(a0, t, a, p1, teacher_rollout, rng):
+    """Agreement from step t on, after taking action a at step t (the root action a0 of the roll-in decides the branch
+    when t > 0) and then following the teacher (where teacher_rollout) or the student p1."""
+    n = len(a0)
+    states = np.column_stack([np.zeros(n, int), 1 + np.where(t == 0, a, a0)[:, None] * H + np.arange(H)[None, :]])
+    teacher = TEACHER[states]
+    act = np.where(teacher_rollout[:, None], teacher, (rng.random((n, T)) < p1[states]).astype(int))
+    act[np.arange(n), t] = a
+    return (np.where(act == teacher, 1.0, -1.0) * (np.arange(T)[None, :] >= t[:, None])).sum(1)
+
+
+def lols(student, rng, beta=0.0, iters=40, episodes=3000):
+    """LOLS (see reproduce.lols): both actions at one random step per episode, each followed by a roll-out with the
+    teacher (probability beta) or the student."""
+    q_sum, q_n = np.zeros((N_STATES, 2)), np.zeros((N_STATES, 2))
+    theta, p1 = np.zeros(student.n_params), np.full(N_STATES, 0.5)
+    for _ in range(iters):
+        states, act, _, _ = rollout(p1, episodes, rng)
+        t = rng.integers(0, T, episodes)
+        s = states[np.arange(episodes), t]
+        teacher_rollout = rng.random(episodes) < beta
+        for a in (0, 1):
+            q = continue_from(act[:, 0], t, np.full(episodes, a), p1, teacher_rollout, rng)
+            np.add.at(q_sum[:, a], s, q)
+            np.add.at(q_n[:, a], s, 1)
+        theta, p1 = fit_cost_sensitive(student, q_sum, q_n, theta)
+    return p1, []
 
 
 def clipped_update(student, theta, states, act, adv, lr, eps, epochs):
@@ -122,7 +182,7 @@ def ppo(student, rng, iters=120, episodes=3072, lr=0.065, eps=0.2, epochs=4):
         adv = G - (np.bincount(states.ravel(), weights=G.ravel(), minlength=N_STATES) / np.maximum(n, 1))[states]
         adv = adv / (adv.std() + 1e-8)
         theta = clipped_update(student, theta, states, act, adv, lr, eps, epochs)
-    return student.probs(theta)
+    return student.probs(theta), []
 
 
 def grpo(student, rng, iters=120, groups=192, group_size=8, lr=0.065, eps=0.2, epochs=4):
@@ -132,31 +192,29 @@ def grpo(student, rng, iters=120, groups=192, group_size=8, lr=0.065, eps=0.2, e
         R = rew.sum(1).reshape(groups, group_size)
         A = (R - R.mean(1, keepdims=True)) / (R.std(1, keepdims=True) + 1e-8)
         theta = clipped_update(student, theta, states, act, np.repeat(A.reshape(-1, 1), T, 1), lr, eps, epochs)
-    return student.probs(theta)
+    return student.probs(theta), []
 
 
-METHODS = {"DAgger": dagger, "PPO": ppo, "GRPO": grpo}
-METRICS = ["p_deviate", "signed_return", "errors", "success"]
+METHODS = {  # the same budget and grids as reproduce.py; tuned separately at every student size
+    "DAgger": Method(dagger, EPISODES, fixed={"episodes": EPISODES}),
+    "AggreVaTe": Method(aggrevate, 2 * EPISODES, fixed={"episodes": EPISODES}),
+    "LOLS": Method(lols, 3 * EPISODES, grid={"beta": [0.0, 0.5]}, fixed={"episodes": EPISODES}),
+    "APPO": Method(ppo, EPISODES, grid={"lr": LR_GRID}, fixed={"episodes": EPISODES}),
+    "AGRPO": Method(grpo, 192 * 8, grid={"lr": LR_GRID}),
+}
+SELECT = {name: ("signed_return", +1) for name in METHODS}
+METRICS = ["p_deviate", "signed_return", "errors", "success", "greedy_signed_return", "greedy_errors", "greedy_success"]
 
 
 def main():
     out = Path(__file__).parent / "results"
-    runs, summary = [], {}
+    runs, tuning, summary = [], {}, {}
     for k in DEGREES:
-        student = Student(k)
-        for method, train in METHODS.items():
-            t0 = time.time()
-            rows = []
-            for seed in SEEDS:
-                p1 = train(student, np.random.default_rng(seed))
-                rows.append({"degree": k, "method": method, "seed": seed, "policy": p1.tolist(), **evaluate(p1, seed)})
-            runs += rows
-            stats = {m: (float(np.mean([r[m] for r in rows])), float(np.std([r[m] for r in rows], ddof=1)))
-                     for m in METRICS}
-            summary.setdefault(str(k), {})[method] = stats
-            print(f"k={k} {method:6s} " + "  ".join(f"{m} {mu:.3f} ± {sd:.3f}" for m, (mu, sd) in stats.items())
-                  + f"  ({time.time() - t0:.1f}s)", flush=True)
-    (out / "distill.json").write_text(json.dumps({"runs": runs, "summary": summary}))
+        rows, tuning[k] = tune_and_report(Student(k), METHODS, evaluate, SELECT, f"k={k}",
+                                          ["p_deviate", "errors", "success", "greedy_errors"])
+        runs += [{"degree": k, **r} for r in rows]
+        summary[str(k)] = summarize(rows, METRICS)
+    (out / "distill.json").write_text(json.dumps({"runs": runs, "summary": summary, "tuning": tuning}))
 
 
 if __name__ == "__main__":

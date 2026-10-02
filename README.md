@@ -1,97 +1,92 @@
 # When immediate imitation is not enough
 
 Code for the post [When immediate imitation is not enough](https://khanhptnk.github.io/machine-learning/future-aware-imitation):
-toy environments for the three reasons imitation can be impossible (privileged information, a hard-to-imitate expert,
-and limited capacity), comparing DAgger with **Agreement PPO**: PPO on the learner's own roll-outs with a reward of +1
-when its action matches the expert's and −1 otherwise, credited with undiscounted returns. Agreement GRPO is the same
-reward with a minimal GRPO-style update. Everything runs on a CPU in a few minutes with NumPy.
+toy environments for three reasons imitation can be impossible (privileged information, a hard-to-imitate expert, and
+limited capacity), and how DAgger, AggreVaTe, LOLS and **Agreement PPO (APPO)** handle them.
+
+APPO is PPO on the learner's own roll-outs with a reward of +1 when its action matches the expert's and −1 otherwise,
+credited with undiscounted returns. AGRPO is the same reward with a minimal GRPO-style update. Everything is NumPy and
+runs on a CPU.
 
 ```sh
-uv run reproduce.py            # ~1 min: 3 methods x 2 environments x 12 seeds; writes results/runs.json, summary.json
-uv run distill.py              # ~2 min: deterministic teacher, student degree 0-7; writes results/distill.json
-uv run distill_stochastic.py   # ~3 min: stochastic teacher, 4 distillation objectives; results/distill_stochastic.json
+uv run reproduce.py            # ~10 min: cases 1 and 2, five methods, tuned; results/runs.json, results/tuning.json
+uv run distill.py              # ~20 min: case 3, deterministic teacher, student degree 0-7; results/distill.json
+uv run distill_stochastic.py   # ~30 min: case 3, stochastic teacher, six distillation objectives; results/distill_stochastic.json
 uv run plots.py                # figures/*.svg (light and dark versions) from results/*.json
+uv run reproduce.py --note     # the original note's settings, which reproduce its tables
 ```
 
-`results/` holds the JSON from the run behind the post, so `plots.py` works without re-running anything.
+`results/` holds the JSON from the runs behind the post (every tuning trial included), so `plots.py` works without
+re-running anything.
 
-## Cases 1 and 2: privileged information and a hard-to-imitate expert
+## Protocol (`protocol.py`)
 
-Each episode samples a hidden bit `z ~ Bernoulli(0.5)` that the expert sees and the learner doesn't. The learner makes
-9 binary decisions: one at a root observation that hides `z`, then 8 downstream. Each decision earns +1 if it matches the
-expert's action and −1 if not. The policy is tabular (one Bernoulli logit per observation ID), so nothing learned
-downstream can generalize back to the root.
+- **Equal budget:** every method simulates 368,640 episodes per training run, counting roll-ins and roll-outs alike
+  (DAgger and APPO 120 iterations × 3,072 episodes; AggreVaTe 60 iterations, one expert roll-out per roll-in; LOLS 40
+  iterations, two roll-outs per roll-in; AGRPO 240 iterations × 1,536).
+- **Tuning:** each knob is searched separately in every setting on seeds 100–104, and the chosen value is retrained and
+  reported on seeds 0–11. Learning rates for APPO and AGRPO: twelve values from 0.0075 to 16; for the RL distillation
+  objectives, sixteen values from 0.0005 to 16. LOLS: β ∈ {0, 0.5}. DAgger and AggreVaTe fit their data exactly and have
+  nothing to tune. Selection: the imitation objective J (expected agreement) for the ±1 methods, and the sequence-level
+  reverse KL for the reverse-KL distillation objectives.
+- **Evaluation:** 50,000 fresh episodes from `default_rng(9000 + seed)`, both sampling actions and playing each
+  policy's more likely action ("greedy"); exact over all 512 action sequences with the stochastic teacher.
 
-- **Privileged information** (`reveal`). The expert plays `z` at every step. Root action 1 leads to downstream
-  observations that reveal `z`; root action 0 leads to one that still hides it.
-- **Hard-to-imitate expert** (`hard`). A correct root action enters an easy corridor, the root mistake "1 when z = 0" a
-  recoverable corridor, and the mistake "0 when z = 1" a hard corridor. The expert plays action 0 throughout the easy and
-  recoverable corridors, and a fresh coin flip at every step of the hard one.
+## The methods
 
-In both, either root action matches the expert with probability 1/2, so DAgger's root target is exactly 1/2. Action 1
-leads to a future the learner can imitate.
+All of them roll out the learner and query the expert at the states it visits; they differ in what credits an action.
 
-## Results (12 seeds, mean ± standard deviation; 50,000 evaluation episodes per seed)
+| | Credit for an action | Who plays the future | Policy update |
+|---|---|---|---|
+| DAgger | matching the expert now | nobody | supervised fit |
+| AggreVaTe | return from that step on | the expert | cost-sensitive classifier on aggregated values |
+| LOLS | return from that step on, both actions tried at the same state | the learner (β = 0) | cost-sensitive classifier on aggregated values |
+| APPO, AGRPO | return from that step on | the learner, in the same episode | clipped policy gradient |
 
-| Privileged information | P(root action 1) | Signed return | Errors / episode | Success (≤ 2 errors) |
-|---|---|---|---|---|
-| DAgger | 0.500 ± 0.002 | 4.00 ± 0.02 | 2.499 ± 0.009 | 54.5% ± 0.2% |
-| Agreement PPO | 0.986 ± 0.000 | 7.19 ± 0.01 | 0.905 ± 0.004 | 96.2% ± 0.1% |
-| Agreement GRPO | 0.967 ± 0.001 | 7.01 ± 0.01 | 0.995 ± 0.006 | 96.0% ± 0.1% |
+## The environments
 
-| Hard-to-imitate expert | P(root action 1) | Signed return | Errors / episode | Success (≤ 2 errors) |
-|---|---|---|---|---|
-| DAgger | 0.500 ± 0.001 | 6.00 ± 0.02 | 1.499 ± 0.012 | 75.9% ± 0.3% |
-| Agreement PPO | 0.970 ± 0.001 | 7.18 ± 0.01 | 0.911 ± 0.004 | 96.1% ± 0.1% |
-| Agreement GRPO | 0.902 ± 0.003 | 6.83 ± 0.02 | 1.085 ± 0.008 | 92.9% ± 0.2% |
+Every environment has 9 binary decisions: a root decision, then 8 steps whose situation depends on the root action. Each
+step earns +1 if the learner's action matches the expert's and −1 if not. The root has its own parameter.
 
-DAgger's numbers have closed forms: 54.49% success (privileged information) and 75.88% (hard-to-imitate expert).
+- **Case 1, privileged information** (`reveal`): a hidden bit z is the expert's action at every step. Root action 1
+  makes the later observations reveal z; root action 0 keeps it hidden.
+- **Case 2, hard-to-imitate expert** (`hard`): a correct root action enters an easy corridor, the mistake "1 when z = 0"
+  a recoverable corridor, the mistake "0 when z = 1" a hard corridor where the expert flips a fresh coin at every step.
+- **Case 3, limited capacity** (`distill.py`): nothing is hidden. The teacher plays 0 at the root, then the parity of t
+  in branch 0 (which needs a degree-7 polynomial) and 0 in branch 1. The student is a degree-k polynomial in t per branch,
+  plus a root logit.
 
-## Case 3: limited capacity (distillation into a smaller student)
+## Results (12 seeds; errors per episode, mean)
 
-`distill.py` and `distill_stochastic.py`. Nothing is hidden: the state is (branch, t). The teacher plays 0 at the root,
-so its own path is branch 0, where it plays the parity of t; in branch 1 it plays 0. The student has a root logit and,
-per branch, a logistic policy whose logit is a degree-k polynomial in t (Legendre features). Degree 7 fits the teacher
-exactly; a smaller student makes at least ceil((7 − k) / 2) errors on the teacher's path, while leaving it at the root
-costs one error.
-
-**Deterministic teacher** (mean errors per episode, 12 seeds):
-
-| Student degree k | 0 | 1–2 | 3–4 | 5–6 | 7 |
+| | DAgger | AggreVaTe | LOLS | APPO | AGRPO |
 |---|---|---|---|---|---|
-| DAgger | 4.00 | 3.82 | 3.37 | 2.46 | **0.00** |
-| Agreement PPO | 1.01 | 1.01 | 1.01 | 1.01 | 0.95 |
-| Agreement GRPO | 1.07 | 1.07 | 1.06 | 1.05 | 1.04 |
+| Case 1 (best possible: 0.5) | 2.50 | 2.50 (per-seed coin flip) | **0.50** | **0.50** | 0.52 |
+| Case 2 (best possible: 0.5) | 1.50 | 1.16 (per-seed coin flip) | **0.50** | **0.50** | 0.53 |
+| Case 3, degree-1 student (best possible: 1) | 3.82 | 4.00 | **1.00** | **1.00** | **1.00** |
+| Case 3, degree-7 student (best possible: 0) | **0.00** | **0.00** | **0.00** | 0.06 (0 greedy) | 0.03 |
 
-DAgger always follows the teacher (P(leave) = 0); Agreement PPO and GRPO leave its path in 98–99.8% of episodes below k = 7.
+DAgger and AggreVaTe never prefer the action that makes the rest of the episode imitable: DAgger's root target is the
+expert's action averaged over what the learner can't see, and AggreVaTe's estimated value of each root action assumes the
+expert plays the rest. LOLS and APPO score actions by the learner's own future and are optimal in all three cases.
+Exact values, standard deviations and the stochastic-teacher comparison are in the post and in `results/`.
 
-**Stochastic teacher** (0.9 on the action above in every state). Four objectives on the student's own roll-outs:
-on-policy forward KL (DAgger with soft labels), per-token reverse KL with discount 0, reverse KL with returns
-(sequence-level reverse KL), and Agreement PPO. Evaluation is exact (all 512 action sequences). At k = 1:
+**Stochastic teacher** (case 3, `distill_stochastic.py`: probability 0.9 on the teacher's action above in every state;
+degree-1 student; exact evaluation):
 
-| Objective | P(leave) | Errors | Success | KL(P_S ‖ P_T) | KL(P_T ‖ P_S) |
-|---|---|---|---|---|---|
-| teacher | 0.10 | 0.90 | 94.7% | 0 | 0 |
-| forward KL | 0.100 | 3.64 | 23.1% | 3.49 | 2.54 |
-| reverse KL, γ = 0 | 0.103 | 3.61 | 23.7% | 3.47 | 2.55 |
-| reverse KL, returns | 0.840 | 2.12 | 71.1% | 2.13 | 3.90 |
-| Agreement PPO | 0.998 | 1.01 | 99.8% | 3.11 | 14.2 |
+| Objective | P(leave the teacher's path) | Errors | KL(P_S ‖ P_T) | KL(P_T ‖ P_S) |
+|---|---|---|---|---|
+| teacher | 0.10 | 0.90 | 0 | 0 |
+| off-policy KD | 0.100 | 3.64 | 3.49 | 2.54 |
+| on-policy forward KL | 0.100 | 3.64 | 3.49 | 2.54 |
+| on-policy JSD (β = 0.5) | 0.100 | 3.61 | 3.48 | 2.55 |
+| reverse KL, discount 0 (tuning stops it early) | 0.376 | 3.25 | 2.74 | 2.75 |
+| reverse KL with returns | 0.840 | 2.12 | **2.13** | 3.90 |
+| APPO | 1.000 | **1.00** | 3.15 | 50 |
 
-At k = 0 the exact optimum of the sequence-level reverse KL leaves with probability 0.869 at 2.162 nats; reverse KL
-with returns reaches 0.866 and 2.162.
-
-## Training details
-
-- **DAgger:** 40 iterations × 3,000 learner roll-outs. Expert labels at every visited observation are aggregated over all
-  iterations, and the policy is their label frequencies (pseudocount 1e-3).
-- **Agreement PPO:** 120 iterations × 3,072 episodes; undiscounted reward-to-go; baseline = batch-mean return-to-go at the same
-  observation; advantages divided by their global standard deviation; clipped surrogate with ε = 0.2; 4 full-batch
-  gradient-ascent epochs with learning rate 0.065. No value network.
-- **Agreement GRPO:** 120 iterations × 192 groups of 8 trajectories sharing `z`; each trajectory's total return is normalized
-  within its group and assigned to all of its actions; same clipped update. No KL term or reference policy.
-- In the clipped update, each observation's logit gets the **mean gradient over the samples at that observation**.
-
-Seeds 0–11 for training and `default_rng(9000 + seed)` for evaluation.
+The per-token objectives follow the teacher at the root; reverse KL with discount zero does too once trained to
+convergence (reverse KL ≈ 3.48), but scores best when stopped partway, so its tuned step size is small. The objectives with
+returns leave the teacher's path. At k = 0, reverse KL with returns reaches the exact optimum of the sequence-level reverse
+KL (leave 0.869 at 2.162 nats; training: 0.866 and 2.162).
 
 ## License
 

@@ -1,6 +1,6 @@
 # When immediate imitation is not enough
 
-Code for the post [When immediate imitation is not enough](https://khanhptnk.github.io/machine-learning/future-aware-imitation):
+Code for the post [When immediate imitation is not enough](https://machineslearner.com/machine-learning/future-aware-imitation):
 toy environments for three reasons imitation can be impossible (privileged information, a stochastic expert, and
 limited capacity), and how DAgger, AggreVaTe, LOLS and **Agreement PPO (APPO)** handle them.
 
@@ -9,9 +9,10 @@ credited with undiscounted returns, with no entropy bonus or KL term. AGRPO is t
 update; it behaves like APPO and isn't shown in the post. Everything is NumPy and
 runs on a CPU.
 
-The idea in one line: when the learner can't represent the expert, the projection of the expert onto the learner's
-policy class and the best policy in that class are different policies. DAgger and AggreVaTe find the projection; LOLS
-and APPO find the best policy, because they score actions by the learner's own future.
+The idea in one line: when the learner can't imitate the expert, the projection of the expert onto the learner's
+policy class (the closest policy by the method's own measure) and the best policy in that class are in general not the
+same policy. DAgger and AggreVaTe find the projection; LOLS and APPO find the best policy, because they score actions by
+the learner's own future.
 
 ```sh
 uv run reproduce.py            # ~10 min: cases 1 and 2, five methods, tuned; results/runs.json, results/tuning.json
@@ -23,7 +24,9 @@ uv run reproduce.py --note     # the original note's settings, which reproduce i
 ```
 
 `results/` holds the JSON from the runs behind the post (every tuning trial included), so `plots.py` works without
-re-running anything.
+re-running anything. `uv run checks.py` (~1 min) runs numerical checks of the implementations: the
+updates against finite-difference gradients of their objectives, the value estimates against simulation and exact values,
+the exact evaluations against Monte Carlo, every method's episode count against the budget, and the tuning picks.
 
 ## Protocol (`protocol.py`)
 
@@ -46,7 +49,7 @@ All of them roll out the learner and query the expert at the states it visits; t
 |---|---|---|---|
 | DAgger | matching the expert now | nobody | supervised fit |
 | AggreVaTe | return from that step on | the expert | cost-sensitive classifier on aggregated values |
-| LOLS | return from that step on, both actions tried at the same state | the learner (β = 0) | cost-sensitive classifier on aggregated values |
+| LOLS | return from that step on, every action tried at the same state (two here) | the learner (β = 0) | cost-sensitive classifier on aggregated values |
 | APPO, AGRPO | return from that step on | the learner, in the same episode | clipped policy gradient |
 
 ## The environments
@@ -97,8 +100,8 @@ KL (leave 0.869 at 2.162 nats; training: 0.866 and 2.162).
 
 ## Entropy bonus (`entropy_ablation.py`)
 
-APPO has no entropy bonus. Adding one, swept from 0.003 to 1 at APPO's tuned learning rate, leaves its root decisions
-essentially unchanged up to 0.3; larger coefficients only make the policy noisier. With the stochastic teacher it trades
+APPO has no entropy bonus. Adding one, swept from 0.003 to 1 at APPO's tuned learning rate, changes no decision up to 0.1
+(errors rise by at most 0.02); from 0.3 on the policy gets noisier, while its root decisions mostly hold. With the stochastic teacher it trades
 errors for KL but stays far from the distribution-matching objectives. With the stochastic teacher at degree 7, for example,
 a coefficient of 0.3 lowers APPO's forward KL from 5.26 to 3.45 nats and raises its errors from 0.06 to 0.14, while
 reverse KL with returns reaches 0.02. With a degree-1 student the bonus has no effect: the logits saturate within a few

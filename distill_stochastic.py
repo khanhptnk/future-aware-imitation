@@ -52,6 +52,8 @@ def evaluate(student, p1: np.ndarray, seed=None) -> dict:
         q = q1[_STATES]
         return np.log(np.where(_SEQS == 1, q, 1 - q)).sum(1)
 
+    # Exact up to float64: once a logit passes ~37, sigmoid rounds to 1, the other action gets probability 0 and the
+    # forward KL comes out inf. The reported runs stay below 30 (checked against log-sigmoid of the logits).
     with np.errstate(divide="ignore", invalid="ignore"):  # a saturated student can give sequences probability 0
         log_s, log_t = logprob(np.asarray(p1)), logprob(TEACHER_P1)
     P_s, P_t = np.exp(log_s), np.exp(log_t)

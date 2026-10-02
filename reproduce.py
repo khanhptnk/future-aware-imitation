@@ -90,17 +90,65 @@ def evaluate(env: Env, p1: np.ndarray, seed: int) -> dict:
     return out
 
 
+def curve(env: Env, p1: np.ndarray, seed: int) -> dict:
+    """The cheaper evaluation used at every checkpoint (averages over training): 10,000 episodes, actions sampled."""
+    rng = np.random.default_rng(9000 + seed)
+    _, _, _, rew = env.rollout(p1, rng.integers(0, 2, 10_000), rng)
+    return {"signed_return": float(rew.sum(1).mean()), "errors": float((rew < 0).sum(1).mean())}
+
+
+def mean_se(x) -> tuple:
+    """Mean and standard error of per-episode values."""
+    x = np.asarray(x, float)
+    return float(x.mean()), float(x.std(ddof=1) / np.sqrt(len(x)))
+
+
+def pooled_loss(n, L, v=0.0) -> tuple:
+    """Mean and standard error of a loss over aggregated samples: n[s] samples at state s, with mean loss L[s] and
+    within-state variance v[s]."""
+    N = n.sum()
+    m = (n * L).sum() / N
+    return float(m), float(np.sqrt((n * (v + (L - m) ** 2)).sum()) / N)
+
+
+def log_loss(n1, n, p) -> tuple:
+    """Cross-entropy of P(action 1) = p against labels aggregated per state (n1 of n are 1; soft labels allowed)."""
+    p = np.clip(p, 1e-12, 1 - 1e-12)
+    f = n1 / n
+    lp, lq = np.log(p), np.log(1 - p)
+    return pooled_loss(n, -(f * lp + (1 - f) * lq), f * (1 - f) * (lp - lq) ** 2)
+
+
+def cost_sensitive_loss(q_sum, q_sq, q_n, p1) -> tuple:
+    """The cost-sensitive classifier's training loss on a batch of values: minus the mean value of the actions it plays,
+    weighting each state by its samples; standard error from the sampling error of the value means. A state where only
+    one action was sampled counts that action's value for both."""
+    seen = q_n.sum(1) > 0
+    q_sum, q_sq, q_n, p1 = q_sum[seen], q_sq[seen], q_n[seen], np.asarray(p1)[seen]
+    q_sum, q_sq, q_n = (np.where(q_n > 0, x, x[:, ::-1]) for x in (q_sum, q_sq, q_n))  # only one action sampled
+    n = np.maximum(q_n, 1)
+    mean, var = q_sum / n, np.maximum(q_sq / n - (q_sum / n) ** 2, 0)
+    pi = np.column_stack([1 - p1, p1])
+    w = q_n.sum(1) / q_n.sum()
+    return float(-(w * (pi * mean).sum(1)).sum()), float(np.sqrt((w ** 2 * (pi ** 2 * var / n).sum(1)).sum()))
+
+
 def dagger(env: Env, rng, iters=40, episodes=3000, pseudocount=1e-3):
     """Roll out the learner, label every visited observation with the expert's action, aggregate the counts over all
     iterations, and refit the tabular policy by maximum likelihood (the label frequencies).
-    Returns the final P(action 1 | obs) and the root's P(action 1) after each iteration."""
+    Returns the final P(action 1 | obs) and, for every iteration (round), (the policy played in it, its training loss
+    on that round's data, the loss's standard error), as every method does: the learner's loss in each round of online
+    learning. Here the loss is the cross-entropy on the labels collected in the round."""
     counts = np.full((env.n_obs, 2), pseudocount)
     history = []
     for _ in range(iters):
         p1 = counts[:, 1] / counts.sum(1)
         obs, _, expert, _ = env.rollout(p1, rng.integers(0, 2, episodes), rng)
-        np.add.at(counts, (obs.ravel(), expert.ravel()), 1)
-        history.append(counts[0, 1] / counts[0].sum())
+        batch = np.zeros((env.n_obs, 2))
+        np.add.at(batch, (obs.ravel(), expert.ravel()), 1)
+        counts += batch
+        seen = batch.sum(1) > 0
+        history.append((p1, *log_loss(batch[seen, 1], batch[seen].sum(1), p1[seen])))  # p1: the policy played
     return counts[:, 1] / counts.sum(1), history
 
 
@@ -118,17 +166,20 @@ def explore(obs, expert, rng):
 def aggrevate(env: Env, rng, iters=40, episodes=3000):
     """AggreVaTe (Ross & Bagnell, 2014) with learner roll-in, the same budget as DAgger. Values are aggregated over all
     iterations, and the policy is the cost-sensitive classifier for the tabular class: at each observation, the action
-    with the higher mean value (observations never explored stay uniform)."""
-    q_sum, q_n = np.zeros((env.n_obs, 2)), np.zeros((env.n_obs, 2))
+    with the higher mean value (observations never explored stay uniform). Training loss: cost_sensitive_loss."""
+    q_sum, q_sq, q_n = np.zeros((env.n_obs, 2)), np.zeros((env.n_obs, 2)), np.zeros((env.n_obs, 2))
     p1, history = np.full(env.n_obs, 0.5), []
     for _ in range(iters):
         obs, _, expert, _ = env.rollout(p1, rng.integers(0, 2, episodes), rng)
         o, a, q = explore(obs, expert, rng)
-        np.add.at(q_sum, (o, a), q)
-        np.add.at(q_n, (o, a), 1)
+        b_sum, b_sq, b_n = np.zeros((env.n_obs, 2)), np.zeros((env.n_obs, 2)), np.zeros((env.n_obs, 2))
+        np.add.at(b_sum, (o, a), q)
+        np.add.at(b_sq, (o, a), q * q)
+        np.add.at(b_n, (o, a), 1)
+        history.append((p1, *cost_sensitive_loss(b_sum, b_sq, b_n, p1)))  # the policy played, on this round's values
+        q_sum, q_sq, q_n = q_sum + b_sum, q_sq + b_sq, q_n + b_n
         mean = q_sum / np.maximum(q_n, 1)
         p1 = np.where((q_n > 0).all(1), (mean[:, 1] > mean[:, 0]).astype(float), 0.5)
-        history.append(p1[0])
     return p1, history
 
 
@@ -137,7 +188,7 @@ def lols(env: Env, rng, beta=0.0, iters=40, episodes=3000):
     after each, roll out to the end with the expert (probability beta, one choice per episode) or the learner, and score
     the action by the agreement collected from t on. The policy is the same cost-sensitive classifier as aggrevate.
     beta = 0: learned roll-outs only; beta = 1 would be AggreVaTe's expert roll-outs, but trying both actions."""
-    q_sum, q_n = np.zeros((env.n_obs, 2)), np.zeros((env.n_obs, 2))
+    q_sum, q_sq, q_n = np.zeros((env.n_obs, 2)), np.zeros((env.n_obs, 2)), np.zeros((env.n_obs, 2))
     p1, history = np.full(env.n_obs, 0.5), []
     for _ in range(iters):
         z = rng.integers(0, 2, episodes)
@@ -145,13 +196,16 @@ def lols(env: Env, rng, beta=0.0, iters=40, episodes=3000):
         t = rng.integers(0, T, episodes)
         o = obs[np.arange(episodes), t]
         expert_rollout = rng.random(episodes) < beta
+        b_sum, b_sq, b_n = np.zeros((env.n_obs, 2)), np.zeros((env.n_obs, 2)), np.zeros((env.n_obs, 2))
         for a in (0, 1):
             q = env.continue_from(z, act[:, 0], t, np.full(episodes, a), p1, expert_rollout, rng)
-            np.add.at(q_sum[:, a], o, q)
-            np.add.at(q_n[:, a], o, 1)
+            np.add.at(b_sum[:, a], o, q)
+            np.add.at(b_sq[:, a], o, q * q)
+            np.add.at(b_n[:, a], o, 1)
+        history.append((p1, *cost_sensitive_loss(b_sum, b_sq, b_n, p1)))  # the policy played, on this round's values
+        q_sum, q_sq, q_n = q_sum + b_sum, q_sq + b_sq, q_n + b_n
         mean = q_sum / np.maximum(q_n, 1)
         p1 = np.where((q_n > 0).all(1), (mean[:, 1] > mean[:, 0]).astype(float), 0.5)
-        history.append(p1[0])
     return p1, history
 
 
@@ -177,36 +231,45 @@ def returns_to_go(rew):
     return np.flip(np.cumsum(np.flip(rew, 1), 1), 1)
 
 
+def bernoulli_entropy(p):
+    p = np.clip(p, 1e-12, 1 - 1e-12)
+    return -(p * np.log(p) + (1 - p) * np.log(1 - p))
+
+
 def ppo(env: Env, rng, iters=120, episodes=3072, lr=0.065, eps=0.2, epochs=4, ent=0.0):
     """No value network: the baseline for each sample is the batch-mean return-to-go of samples with the same
-    observation, then all advantages are divided by their global standard deviation."""
+    observation, then all advantages are divided by their global standard deviation. Training loss: minus the batch's
+    mean episode return (plus ent times the episode's summed entropy, the objective with an entropy bonus), recorded
+    with the policy that collected the batch."""
     theta = np.zeros(env.n_obs)
     history = []
     for _ in range(iters):
-        obs, act, _, rew = env.rollout(sigmoid(theta), rng.integers(0, 2, episodes), rng)
+        p1 = sigmoid(theta)
+        obs, act, _, rew = env.rollout(p1, rng.integers(0, 2, episodes), rng)
+        history.append((p1, *mean_se(-rew.sum(1) - ent * bernoulli_entropy(p1[obs]).sum(1))))
         G = returns_to_go(rew)
         n = np.bincount(obs.ravel(), minlength=env.n_obs)
         baseline = np.bincount(obs.ravel(), weights=G.ravel(), minlength=env.n_obs) / np.maximum(n, 1)
         adv = G - baseline[obs]
         adv = adv / (adv.std() + 1e-8)
         theta = clipped_update(theta, obs, act, adv, lr, eps, epochs, ent)
-        history.append(sigmoid(theta[0]))
     return sigmoid(theta), history
 
 
 def grpo(env: Env, rng, iters=120, groups=192, group_size=8, lr=0.065, eps=0.2, epochs=4):
     """Groups of trajectories that share z. Each trajectory's total return is normalized within its group, and that one
-    advantage is given to every action in the trajectory."""
+    advantage is given to every action in the trajectory. Training loss as in ppo."""
     theta = np.zeros(env.n_obs)
     history = []
     for _ in range(iters):
         z = np.repeat(rng.integers(0, 2, groups), group_size)
-        obs, act, _, rew = env.rollout(sigmoid(theta), z, rng)
+        p1 = sigmoid(theta)
+        obs, act, _, rew = env.rollout(p1, z, rng)
+        history.append((p1, *mean_se(-rew.sum(1))))
         R = rew.sum(1).reshape(groups, group_size)
         A = (R - R.mean(1, keepdims=True)) / (R.std(1, keepdims=True) + 1e-8)
         adv = np.repeat(A.reshape(-1, 1), T, 1)
         theta = clipped_update(theta, obs, act, adv, lr, eps, epochs)
-        history.append(sigmoid(theta[0]))
     return sigmoid(theta), history
 
 
@@ -215,6 +278,7 @@ METHODS = {  # every method simulates protocol.BUDGET episodes; grids are search
     "DAgger": Method(dagger, EPISODES, fixed={"episodes": EPISODES}),
     "AggreVaTe": Method(aggrevate, 2 * EPISODES, fixed={"episodes": EPISODES}),  # roll-in + one expert roll-out
     "LOLS": Method(lols, 3 * EPISODES, grid={"beta": [0.0, 0.5]}, fixed={"episodes": EPISODES}),  # + two roll-outs
+    "LOLS (β=0.5)": Method(lols, 3 * EPISODES, fixed={"episodes": EPISODES, "beta": 0.5}),  # the LOLS paper's setting
     "APPO": Method(ppo, EPISODES, grid={"lr": LR_GRID}, fixed={"episodes": EPISODES}),
     "AGRPO": Method(grpo, 192 * 8, grid={"lr": LR_GRID}),
 }
@@ -239,7 +303,8 @@ def main():
     runs, tuning = [], {}
     for env_name in ("reveal", "hard"):
         rows, tuning[env_name] = tune_and_report(Env(env_name), METHODS, evaluate, SELECT, env_name,
-                                                 ["p_root_1", "errors", "success", "greedy_errors", "greedy_success"])
+                                                 ["p_root_1", "errors", "success", "greedy_errors", "greedy_success"],
+                                                 curve)
         runs += [{"env": env_name, **r} for r in rows]
     (out / "runs.json").write_text(json.dumps(runs))
     (out / "tuning.json").write_text(json.dumps(tuning, indent=1))

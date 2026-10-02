@@ -225,6 +225,7 @@ SOFT = [("off-policy KD", "off-policy KD", "DAgger", (0, (1, 1.5)), "v"),
         ("JSD", "on-policy JSD", "DAgger", (0, (6, 2)), "D"),
         ("reverse KL (γ=0)", "reverse KL, discount 0", "DAgger", (0, (4, 2)), "s"),
         ("reverse KL", "reverse KL with returns", "PPO", (0, (4, 2)), "s"),
+        ("MiniLLM", "MiniLLM (as published)", "PPO", (0, (1, 1.5)), "^"),
         ("APPO", "APPO", "PPO", "-", "o")]
 
 
@@ -241,13 +242,13 @@ def fig_distill_soft(c, data, out):
         ax.set_xlabel("student degree k")
         ax.set_title(title, color=c["ink"], fontsize=10, loc="left")
     axes[0].axhline(0.1, color=c["ref"], lw=0.9, ls=(0, (1, 2)))
-    axes[0].annotate("teacher: 0.1", (0.0, 0.135), color=c["ink2"], fontsize=9)
+    axes[0].annotate("teacher: 0.1", (3.3, 0.035), color=c["ink2"], fontsize=9)
     axes[0].set_ylim(0, 1.05)
     axes[1].set_ylim(0, 4.0)
     handles, labels = axes[0].get_legend_handles_labels()
     fig.legend(handles, labels, frameon=False, labelcolor=c["ink"], fontsize=9, loc="lower center", ncol=3,
                bbox_to_anchor=(0.5, 0.0))
-    fig.tight_layout(rect=(0, 0.13, 1, 1))
+    fig.tight_layout(rect=(0, 0.17, 1, 1))
     save(fig, out)
 
 

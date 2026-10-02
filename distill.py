@@ -25,7 +25,8 @@ import numpy as np
 from numpy.polynomial import legendre
 
 from protocol import EPISODES, Method, summarize, tune_and_report
-from reproduce import H, LR_GRID, T, explore, returns_to_go, sigmoid
+from reproduce import (H, LR_GRID, T, bernoulli_entropy, cost_sensitive_loss, explore, log_loss, mean_se,
+                       returns_to_go, sigmoid)
 
 DEGREES = range(8)
 EVAL_EPISODES = 50_000
@@ -94,13 +95,18 @@ def fit_logistic(student, n1, n, theta, iters=50, ridge=1e-6):
 
 def dagger(student, rng, iters=40, episodes=3000, pseudocount=1e-3):
     n1, n = np.full(N_STATES, pseudocount), np.full(N_STATES, 2 * pseudocount)
-    theta = np.zeros(student.n_params)
+    theta, history = np.zeros(student.n_params), []
     for _ in range(iters):
-        states, _, teacher, _ = rollout(student.probs(theta), episodes, rng)
-        np.add.at(n1, states.ravel(), teacher.ravel())
-        np.add.at(n, states.ravel(), 1)
+        p1 = student.probs(theta)
+        states, _, teacher, _ = rollout(p1, episodes, rng)
+        b1, b = np.zeros(N_STATES), np.zeros(N_STATES)
+        np.add.at(b1, states.ravel(), teacher.ravel())
+        np.add.at(b, states.ravel(), 1)
+        seen = b > 0
+        history.append((p1, *log_loss(b1[seen], b[seen], p1[seen])))  # the policy played, on this round's labels
+        n1, n = n1 + b1, n + b
         theta = fit_logistic(student, n1, n, theta)
-    return student.probs(theta), []
+    return student.probs(theta), history
 
 
 def fit_cost_sensitive(student, q_sum, q_n, theta, pseudocount=1e-3):
@@ -116,16 +122,20 @@ def fit_cost_sensitive(student, q_sum, q_n, theta, pseudocount=1e-3):
 
 def aggrevate(student, rng, iters=40, episodes=3000):
     """AggreVaTe with learner roll-in (see reproduce.explore): one random action at one random step per episode, then
-    the teacher finishes the episode."""
-    q_sum, q_n = np.zeros((N_STATES, 2)), np.zeros((N_STATES, 2))
-    theta, p1 = np.zeros(student.n_params), np.full(N_STATES, 0.5)
+    the teacher finishes the episode. Training loss: reproduce.cost_sensitive_loss."""
+    q_sum, q_sq, q_n = np.zeros((N_STATES, 2)), np.zeros((N_STATES, 2)), np.zeros((N_STATES, 2))
+    theta, p1, history = np.zeros(student.n_params), np.full(N_STATES, 0.5), []
     for _ in range(iters):
         states, _, teacher, _ = rollout(p1, episodes, rng)
         s, a, q = explore(states, teacher, rng)
-        np.add.at(q_sum, (s, a), q)
-        np.add.at(q_n, (s, a), 1)
+        b_sum, b_sq, b_n = np.zeros((N_STATES, 2)), np.zeros((N_STATES, 2)), np.zeros((N_STATES, 2))
+        np.add.at(b_sum, (s, a), q)
+        np.add.at(b_sq, (s, a), q * q)
+        np.add.at(b_n, (s, a), 1)
+        history.append((p1, *cost_sensitive_loss(b_sum, b_sq, b_n, p1)))  # the policy played, on this round's values
+        q_sum, q_sq, q_n = q_sum + b_sum, q_sq + b_sq, q_n + b_n
         theta, p1 = fit_cost_sensitive(student, q_sum, q_n, theta)
-    return p1, []
+    return p1, history
 
 
 def continue_from(a0, t, a, p1, teacher_rollout, rng):
@@ -141,20 +151,24 @@ def continue_from(a0, t, a, p1, teacher_rollout, rng):
 
 def lols(student, rng, beta=0.0, iters=40, episodes=3000):
     """LOLS (see reproduce.lols): both actions at one random step per episode, each followed by a roll-out with the
-    teacher (probability beta) or the student."""
-    q_sum, q_n = np.zeros((N_STATES, 2)), np.zeros((N_STATES, 2))
-    theta, p1 = np.zeros(student.n_params), np.full(N_STATES, 0.5)
+    teacher (probability beta) or the student. Training loss: reproduce.cost_sensitive_loss."""
+    q_sum, q_sq, q_n = np.zeros((N_STATES, 2)), np.zeros((N_STATES, 2)), np.zeros((N_STATES, 2))
+    theta, p1, history = np.zeros(student.n_params), np.full(N_STATES, 0.5), []
     for _ in range(iters):
         states, act, _, _ = rollout(p1, episodes, rng)
         t = rng.integers(0, T, episodes)
         s = states[np.arange(episodes), t]
         teacher_rollout = rng.random(episodes) < beta
+        b_sum, b_sq, b_n = np.zeros((N_STATES, 2)), np.zeros((N_STATES, 2)), np.zeros((N_STATES, 2))
         for a in (0, 1):
             q = continue_from(act[:, 0], t, np.full(episodes, a), p1, teacher_rollout, rng)
-            np.add.at(q_sum[:, a], s, q)
-            np.add.at(q_n[:, a], s, 1)
+            np.add.at(b_sum[:, a], s, q)
+            np.add.at(b_sq[:, a], s, q * q)
+            np.add.at(b_n[:, a], s, 1)
+        history.append((p1, *cost_sensitive_loss(b_sum, b_sq, b_n, p1)))  # the policy played, on this round's values
+        q_sum, q_sq, q_n = q_sum + b_sum, q_sq + b_sq, q_n + b_n
         theta, p1 = fit_cost_sensitive(student, q_sum, q_n, theta)
-    return p1, []
+    return p1, history
 
 
 def clipped_update(student, theta, states, act, adv, lr, eps, epochs, ent=0.0):
@@ -177,36 +191,51 @@ def clipped_update(student, theta, states, act, adv, lr, eps, epochs, ent=0.0):
 
 
 def ppo(student, rng, iters=120, episodes=3072, lr=0.065, eps=0.2, epochs=4, ent=0.0):
-    theta = np.zeros(student.n_params)
+    """Training loss as in reproduce.ppo."""
+    theta, history = np.zeros(student.n_params), []
     for _ in range(iters):
-        states, act, _, rew = rollout(student.probs(theta), episodes, rng)
+        p1 = student.probs(theta)
+        states, act, _, rew = rollout(p1, episodes, rng)
+        history.append((p1, *mean_se(-rew.sum(1) - ent * bernoulli_entropy(p1[states]).sum(1))))
         G = returns_to_go(rew)
         n = np.bincount(states.ravel(), minlength=N_STATES)
         adv = G - (np.bincount(states.ravel(), weights=G.ravel(), minlength=N_STATES) / np.maximum(n, 1))[states]
         adv = adv / (adv.std() + 1e-8)
         theta = clipped_update(student, theta, states, act, adv, lr, eps, epochs, ent)
-    return student.probs(theta), []
+    return student.probs(theta), history
 
 
 def grpo(student, rng, iters=120, groups=192, group_size=8, lr=0.065, eps=0.2, epochs=4):
-    theta = np.zeros(student.n_params)
+    theta, history = np.zeros(student.n_params), []
     for _ in range(iters):
-        states, act, _, rew = rollout(student.probs(theta), groups * group_size, rng)
+        p1 = student.probs(theta)
+        states, act, _, rew = rollout(p1, groups * group_size, rng)
+        history.append((p1, *mean_se(-rew.sum(1))))
         R = rew.sum(1).reshape(groups, group_size)
         A = (R - R.mean(1, keepdims=True)) / (R.std(1, keepdims=True) + 1e-8)
         theta = clipped_update(student, theta, states, act, np.repeat(A.reshape(-1, 1), T, 1), lr, eps, epochs)
-    return student.probs(theta), []
+    return student.probs(theta), history
 
 
 METHODS = {  # the same budget and grids as reproduce.py; tuned separately at every student size
     "DAgger": Method(dagger, EPISODES, fixed={"episodes": EPISODES}),
     "AggreVaTe": Method(aggrevate, 2 * EPISODES, fixed={"episodes": EPISODES}),
     "LOLS": Method(lols, 3 * EPISODES, grid={"beta": [0.0, 0.5]}, fixed={"episodes": EPISODES}),
+    "LOLS (β=0.5)": Method(lols, 3 * EPISODES, fixed={"episodes": EPISODES, "beta": 0.5}),  # the LOLS paper's setting
     "APPO": Method(ppo, EPISODES, grid={"lr": LR_GRID}, fixed={"episodes": EPISODES}),
     "AGRPO": Method(grpo, 192 * 8, grid={"lr": LR_GRID}),
 }
 SELECT = {name: ("signed_return", +1) for name in METHODS}
-METRICS = ["p_deviate", "signed_return", "errors", "success", "greedy_signed_return", "greedy_errors", "greedy_success"]
+
+
+METRICS = ["p_deviate", "signed_return", "errors", "success", "greedy_signed_return", "greedy_errors", "greedy_success",
+           "over_training_errors"]
+
+
+def curve(student, p1, seed):
+    """The cheaper evaluation used at every checkpoint (averages over training): 10,000 episodes, actions sampled."""
+    _, _, _, rew = rollout(p1, 10_000, np.random.default_rng(9000 + seed))
+    return {"signed_return": float(rew.sum(1).mean()), "errors": float((rew < 0).sum(1).mean())}
 
 
 def main():
@@ -214,7 +243,7 @@ def main():
     runs, tuning, summary = [], {}, {}
     for k in DEGREES:
         rows, tuning[k] = tune_and_report(Student(k), METHODS, evaluate, SELECT, f"k={k}",
-                                          ["p_deviate", "errors", "success", "greedy_errors"])
+                                          ["p_deviate", "errors", "success", "greedy_errors"], curve)
         runs += [{"degree": k, **r} for r in rows]
         summary[str(k)] = summarize(rows, METRICS)
     (out / "distill.json").write_text(json.dumps({"runs": runs, "summary": summary, "tuning": tuning}))

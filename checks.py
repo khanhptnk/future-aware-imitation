@@ -104,6 +104,15 @@ check("JSD gradient used by distill_stochastic.jsd", np.abs(g_code - g_num).max(
       f"max error {np.abs(g_code - g_num).max():.1e}")
 
 
+# MiniLLM's single-step part: d/dz E_{a ~ q}[log p(a) - log q(a)] = (logit p - z) q (1 - q)
+zz = np.linspace(-3, 3, 7); pp = np.array([0.1, 0.9, 0.1, 0.9, 0.5, 0.1, 0.9])
+f = lambda z: (R.sigmoid(z) * np.log(pp / R.sigmoid(z)) + (1 - R.sigmoid(z)) * np.log((1 - pp) / (1 - R.sigmoid(z))))
+analytic = (np.log(pp / (1 - pp)) - zz) * R.sigmoid(zz) * (1 - R.sigmoid(zz))
+numeric = (f(zz + 1e-6) - f(zz - 1e-6)) / 2e-6
+check("MiniLLM single-step gradient (logit p - z) q (1 - q)", np.abs(analytic - numeric).max() < 1e-7,
+      f"max error {np.abs(analytic - numeric).max():.1e}")
+
+
 # ---------------------------------------------------------------- 3. AggreVaTe's value = an actual expert roll-out
 for env_name in ("reveal", "hard"):
     env = R.Env(env_name)
@@ -236,6 +245,27 @@ for k in (0, 1, 3, 7):
     grad = st.phi.T @ (n1 - n * st.probs(th)) - 1e-6 * th
     worst = max(worst, np.abs(grad).max() / n.sum())
 check("fit_logistic converges (relative gradient at the solution)", worst < 1e-8, f"{worst:.1e}")
+
+
+# ---------------------------------------------------------------- training losses used for the convergence rule
+labels = rng.integers(0, 2, 5000); where = rng.integers(0, 4, 5000); pp = np.array([0.3, 0.6, 0.9, 0.5])
+direct = -np.where(labels == 1, np.log(pp[where]), np.log(1 - pp[where]))
+n1, n = np.bincount(where, weights=labels, minlength=4), np.bincount(where, minlength=4).astype(float)
+m, se = R.log_loss(n1, n, pp)
+check("log_loss = mean cross-entropy over samples, with its standard error",
+      abs(m - direct.mean()) < 1e-12 and abs(se - direct.std() / np.sqrt(len(direct))) < 1e-9, f"{m:.4f} vs {direct.mean():.4f}")
+q = rng.normal(5, 2, 5000); act = rng.integers(0, 2, 5000); pol = np.array([1.0, 0.0, 1.0, 0.5])
+qs, qq, qn = np.zeros((4, 2)), np.zeros((4, 2)), np.zeros((4, 2))
+np.add.at(qs, (where, act), q); np.add.at(qq, (where, act), q * q); np.add.at(qn, (where, act), 1)
+m, se = R.cost_sensitive_loss(qs, qq, qn, pol)
+mean = qs / qn
+direct = -sum(qn[s].sum() / qn.sum() * ((1 - pol[s]) * mean[s, 0] + pol[s] * mean[s, 1]) for s in range(4))
+check("cost_sensitive_loss = minus the state-weighted mean value of the played actions", abs(m - direct) < 1e-12,
+      f"{m:.4f} vs {direct:.4f}")
+for name, hist in (("APPO", R.ppo(R.Env("reveal"), np.random.default_rng(0), iters=20, episodes=500, lr=1.0)[1]),
+                   ("AggreVaTe", R.aggrevate(R.Env("reveal"), np.random.default_rng(0), iters=20, episodes=500)[1])):
+    ok = all(len(h) == 3 and np.isfinite(h[1]) and h[2] >= 0 for h in hist)
+    check(f"{name} records (policy, loss, standard error) every iteration", ok)
 
 
 # ---------------------------------------------------------------- 7. the reported settings are the best finite trials

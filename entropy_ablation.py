@@ -2,7 +2,8 @@
 
 APPO has no entropy bonus. This sweep adds one, ent * H(pi(. | o)) per visited observation, with coefficients
 ENTS, at APPO's tuned learning rate in each setting (read from the tuning results), and reports the same metrics as the
-main experiments on the reporting seeds. It is a sweep, not a tuning step: tuning the coefficient by APPO's own objective
+main experiments on the reporting seeds, each run reporting its converged checkpoint (protocol.py; the training loss
+includes the entropy bonus). It is a sweep, not a tuning step: tuning the coefficient by APPO's own objective
 would pick 0, since an entropy bonus can only cost agreement.
 
 Run: uv run entropy_ablation.py        (CPU, ~10 min; after reproduce.py, distill.py and distill_stochastic.py;
@@ -18,7 +19,7 @@ import numpy as np
 import distill
 import distill_stochastic
 import reproduce
-from protocol import REPORT_SEEDS, mean_sd
+from protocol import EPISODES, REPORT_SEEDS, Method, mean_sd, safe_evaluate, train_and_converge
 
 ENTS = [0.0, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0]
 
@@ -42,8 +43,10 @@ def main():
     results = Path(__file__).parent / "results"
     out = []
     for name, setting, train, evaluate, lr in settings(results):
+        m = Method(train, EPISODES)
         for ent in ENTS:
-            rows = [evaluate(setting, train(setting, np.random.default_rng(s), lr=lr, ent=ent)[0], s)
+            rows = [safe_evaluate(evaluate, setting,
+                                  train_and_converge(m, setting, s, lr=lr, ent=ent)[0], s)
                     for s in REPORT_SEEDS]
             root = "p_root_1" if "p_root_1" in rows[0] else "p_deviate"
             row = {"setting": name, "lr": lr, "ent": ent, "root": mean_sd(rows, root)}

@@ -9,9 +9,9 @@ credited with undiscounted returns, with no entropy bonus or KL term. AGRPO is t
 update; it behaves like APPO and isn't shown in the post. Everything is NumPy and
 runs on a CPU.
 
-The idea in one line: when the learner can't represent the expert, the optimal policy (the expert) and the learner's
-best policy (the best it can represent) differ. DAgger and AggreVaTe aim at the expert; LOLS and APPO aim at the
-learner's best policy, because they score actions by the learner's own future.
+The idea in one line: when the learner can't represent the expert, the projection of the expert onto the learner's
+policy class and the best policy in that class are different policies. DAgger and AggreVaTe find the projection; LOLS
+and APPO find the best policy, because they score actions by the learner's own future.
 
 ```sh
 uv run reproduce.py            # ~10 min: cases 1 and 2, five methods, tuned; results/runs.json, results/tuning.json

@@ -452,49 +452,105 @@ z
     <g id="xtick_2">
      <g id="line2d_2"/>
      <g id="text_2">
-      <!-- partly random -->
-      <g style="fill: #ebebec" transform="translate(256.445 220.9) scale(0.1 -0.1)">
+      <!-- stochastic -->
+      <g style="fill: #ebebec" transform="translate(264.845 220.9) scale(0.1 -0.1)">
        <defs>
-        <path id="UbuntuMono-Regular-5c" d="M 749 -1203 
-Q 646 -1203 489 -1168 
-Q 333 -1133 288 -1107 
-L 384 -704 
-Q 429 -730 547 -755 
-Q 666 -781 762 -781 
-Q 1139 -781 1347 -630 
-Q 1555 -480 1741 -96 
-Q 1312 704 953 1593 
-Q 595 2483 371 3315 
-L 934 3315 
-Q 1030 2931 1177 2454 
-Q 1325 1978 1520 1475 
-Q 1715 973 1939 512 
-Q 2118 992 2246 1424 
-Q 2374 1856 2492 2313 
-Q 2611 2771 2752 3315 
-L 3277 3315 
-Q 3059 2394 2771 1510 
-Q 2483 627 2176 -102 
-Q 2016 -486 1817 -729 
-Q 1619 -973 1360 -1088 
-Q 1101 -1203 749 -1203 
+        <path id="UbuntuMono-Regular-56" d="M 1658 -77 
+Q 1344 -77 1062 -29 
+Q 781 19 499 141 
+L 608 614 
+Q 858 493 1136 422 
+Q 1414 352 1734 352 
+Q 2157 352 2368 464 
+Q 2579 576 2579 813 
+Q 2579 986 2448 1104 
+Q 2317 1222 2109 1312 
+Q 1901 1402 1664 1478 
+Q 1466 1549 1267 1635 
+Q 1069 1722 909 1834 
+Q 749 1946 653 2106 
+Q 557 2266 557 2483 
+Q 557 2746 701 2950 
+Q 845 3155 1139 3273 
+Q 1434 3392 1882 3392 
+Q 2144 3392 2432 3353 
+Q 2720 3315 2918 3264 
+L 2829 2797 
+Q 2752 2848 2595 2883 
+Q 2438 2918 2252 2940 
+Q 2067 2963 1888 2963 
+Q 1478 2963 1264 2854 
+Q 1050 2746 1050 2490 
+Q 1050 2355 1158 2256 
+Q 1267 2157 1446 2083 
+Q 1626 2010 1837 1933 
+Q 2054 1850 2275 1757 
+Q 2496 1664 2681 1542 
+Q 2867 1421 2979 1251 
+Q 3091 1082 3091 851 
+Q 3091 544 2934 336 
+Q 2778 128 2461 25 
+Q 2144 -77 1658 -77 
 z
 " transform="scale(0.015625)"/>
-        <path id="UbuntuMono-Regular-3" transform="scale(0.015625)"/>
+        <path id="UbuntuMono-Regular-46" d="M 2131 -77 
+Q 1645 -77 1245 108 
+Q 845 294 605 675 
+Q 365 1056 365 1651 
+Q 365 2125 515 2457 
+Q 666 2790 925 2995 
+Q 1184 3200 1507 3296 
+Q 1830 3392 2170 3392 
+Q 2394 3392 2634 3360 
+Q 2874 3328 3149 3245 
+L 3034 2803 
+Q 2771 2899 2566 2918 
+Q 2362 2938 2182 2938 
+Q 1862 2938 1564 2816 
+Q 1267 2694 1075 2416 
+Q 883 2138 883 1651 
+Q 883 1197 1062 918 
+Q 1242 640 1542 512 
+Q 1843 384 2208 384 
+Q 2445 384 2653 406 
+Q 2861 429 3130 525 
+L 3200 102 
+Q 2938 0 2678 -38 
+Q 2419 -77 2131 -77 
+z
+" transform="scale(0.015625)"/>
+        <path id="UbuntuMono-Regular-4b" d="M 531 0 
+L 531 4877 
+L 1030 4966 
+L 1030 3258 
+Q 1197 3322 1382 3354 
+Q 1568 3386 1754 3386 
+Q 2266 3386 2554 3197 
+Q 2842 3008 2960 2665 
+Q 3078 2323 3078 1869 
+L 3078 0 
+L 2579 0 
+L 2579 1734 
+Q 2579 2182 2499 2441 
+Q 2419 2701 2230 2816 
+Q 2042 2931 1709 2931 
+Q 1510 2931 1312 2886 
+Q 1114 2842 1030 2810 
+L 1030 0 
+L 531 0 
+z
+" transform="scale(0.015625)"/>
        </defs>
-       <use xlink:href="#UbuntuMono-Regular-53"/>
-       <use xlink:href="#UbuntuMono-Regular-44" transform="translate(56 0)"/>
-       <use xlink:href="#UbuntuMono-Regular-55" transform="translate(112 0)"/>
-       <use xlink:href="#UbuntuMono-Regular-57" transform="translate(168 0)"/>
-       <use xlink:href="#UbuntuMono-Regular-4f" transform="translate(224 0)"/>
-       <use xlink:href="#UbuntuMono-Regular-5c" transform="translate(280 0)"/>
-       <use xlink:href="#UbuntuMono-Regular-3" transform="translate(336 0)"/>
-       <use xlink:href="#UbuntuMono-Regular-55" transform="translate(392 0)"/>
-       <use xlink:href="#UbuntuMono-Regular-44" transform="translate(448 0)"/>
-       <use xlink:href="#UbuntuMono-Regular-51" transform="translate(504 0)"/>
-       <use xlink:href="#UbuntuMono-Regular-47" transform="translate(560 0)"/>
-       <use xlink:href="#UbuntuMono-Regular-52" transform="translate(616 0)"/>
-       <use xlink:href="#UbuntuMono-Regular-50" transform="translate(672 0)"/>
+       <use xlink:href="#UbuntuMono-Regular-56"/>
+       <use xlink:href="#UbuntuMono-Regular-57" transform="translate(56 0)"/>
+       <use xlink:href="#UbuntuMono-Regular-52" transform="translate(112 0)"/>
+       <use xlink:href="#UbuntuMono-Regular-46" transform="translate(168 0)"/>
+       <use xlink:href="#UbuntuMono-Regular-4b" transform="translate(224 0)"/>
+       <use xlink:href="#UbuntuMono-Regular-44" transform="translate(280 0)"/>
+       <use xlink:href="#UbuntuMono-Regular-56" transform="translate(336 0)"/>
+       <use xlink:href="#UbuntuMono-Regular-57" transform="translate(392 0)"/>
+       <use xlink:href="#UbuntuMono-Regular-4c" transform="translate(448 0)"/>
+       <use xlink:href="#UbuntuMono-Regular-46" transform="translate(504 0)"/>
       </g>
       <!-- expert -->
       <g style="fill: #ebebec" transform="translate(276.045 232.11) scale(0.1 -0.1)">
@@ -538,30 +594,30 @@ z
       <!-- limited capacity -->
       <g style="fill: #ebebec" transform="translate(407.910441 220.9) scale(0.1 -0.1)">
        <defs>
-        <path id="UbuntuMono-Regular-46" d="M 2131 -77 
-Q 1645 -77 1245 108 
-Q 845 294 605 675 
-Q 365 1056 365 1651 
-Q 365 2125 515 2457 
-Q 666 2790 925 2995 
-Q 1184 3200 1507 3296 
-Q 1830 3392 2170 3392 
-Q 2394 3392 2634 3360 
-Q 2874 3328 3149 3245 
-L 3034 2803 
-Q 2771 2899 2566 2918 
-Q 2362 2938 2182 2938 
-Q 1862 2938 1564 2816 
-Q 1267 2694 1075 2416 
-Q 883 2138 883 1651 
-Q 883 1197 1062 918 
-Q 1242 640 1542 512 
-Q 1843 384 2208 384 
-Q 2445 384 2653 406 
-Q 2861 429 3130 525 
-L 3200 102 
-Q 2938 0 2678 -38 
-Q 2419 -77 2131 -77 
+        <path id="UbuntuMono-Regular-3" transform="scale(0.015625)"/>
+        <path id="UbuntuMono-Regular-5c" d="M 749 -1203 
+Q 646 -1203 489 -1168 
+Q 333 -1133 288 -1107 
+L 384 -704 
+Q 429 -730 547 -755 
+Q 666 -781 762 -781 
+Q 1139 -781 1347 -630 
+Q 1555 -480 1741 -96 
+Q 1312 704 953 1593 
+Q 595 2483 371 3315 
+L 934 3315 
+Q 1030 2931 1177 2454 
+Q 1325 1978 1520 1475 
+Q 1715 973 1939 512 
+Q 2118 992 2246 1424 
+Q 2374 1856 2492 2313 
+Q 2611 2771 2752 3315 
+L 3277 3315 
+Q 3059 2394 2771 1510 
+Q 2483 627 2176 -102 
+Q 2016 -486 1817 -729 
+Q 1619 -973 1360 -1088 
+Q 1101 -1203 749 -1203 
 z
 " transform="scale(0.015625)"/>
        </defs>
@@ -597,44 +653,6 @@ Q 1350 1427 1488 972
 Q 1626 518 1926 89 
 Q 2227 -339 2707 -794 
 L 2413 -1190 
-z
-" transform="scale(0.015625)"/>
-        <path id="UbuntuMono-Regular-56" d="M 1658 -77 
-Q 1344 -77 1062 -29 
-Q 781 19 499 141 
-L 608 614 
-Q 858 493 1136 422 
-Q 1414 352 1734 352 
-Q 2157 352 2368 464 
-Q 2579 576 2579 813 
-Q 2579 986 2448 1104 
-Q 2317 1222 2109 1312 
-Q 1901 1402 1664 1478 
-Q 1466 1549 1267 1635 
-Q 1069 1722 909 1834 
-Q 749 1946 653 2106 
-Q 557 2266 557 2483 
-Q 557 2746 701 2950 
-Q 845 3155 1139 3273 
-Q 1434 3392 1882 3392 
-Q 2144 3392 2432 3353 
-Q 2720 3315 2918 3264 
-L 2829 2797 
-Q 2752 2848 2595 2883 
-Q 2438 2918 2252 2940 
-Q 2067 2963 1888 2963 
-Q 1478 2963 1264 2854 
-Q 1050 2746 1050 2490 
-Q 1050 2355 1158 2256 
-Q 1267 2157 1446 2083 
-Q 1626 2010 1837 1933 
-Q 2054 1850 2275 1757 
-Q 2496 1664 2681 1542 
-Q 2867 1421 2979 1251 
-Q 3091 1082 3091 851 
-Q 3091 544 2934 336 
-Q 2778 128 2461 25 
-Q 2144 -77 1658 -77 
 z
 " transform="scale(0.015625)"/>
         <path id="UbuntuMono-Regular-58" d="M 1818 -70 

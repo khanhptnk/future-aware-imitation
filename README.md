@@ -1,7 +1,7 @@
 # When immediate imitation is not enough
 
 Code for the post [When immediate imitation is not enough](https://khanhptnk.github.io/machine-learning/future-aware-imitation):
-toy environments for three reasons imitation can be impossible (privileged information, a partly random expert, and
+toy environments for three reasons imitation can be impossible (privileged information, a stochastic expert, and
 limited capacity), and how DAgger, AggreVaTe, LOLS and **Agreement PPO (APPO)** handle them.
 
 APPO is PPO on the learner's own roll-outs with a reward of +1 when its action matches the expert's and −1 otherwise,
@@ -56,8 +56,9 @@ step earns +1 if the learner's action matches the expert's and −1 if not. The 
 
 - **Case 1, privileged information** (`reveal`): a hidden bit z is the expert's action at every step. Root action 1
   makes the later observations reveal z; root action 0 keeps it hidden.
-- **Case 2, partly random expert** (`hard`): a correct root action enters an easy corridor, the mistake "1 when z = 0"
-  a recoverable corridor, the mistake "0 when z = 1" a hard corridor where the expert flips a fresh coin at every step.
+- **Case 2, stochastic expert** (`hard`): at the root the expert flips a fair coin z and plays it. Matching it enters an
+  easy corridor, the mistake "1 when z = 0" a recoverable corridor, the mistake "0 when z = 1" a hard corridor where the
+  expert flips a fresh coin at every step.
 - **Case 3, limited capacity** (`distill.py`): nothing is hidden. The teacher plays 0 at the root, then the parity of t
   in branch 0 (which needs a degree-7 polynomial) and 0 in branch 1. The student is a degree-k polynomial in t per branch,
   plus a root logit.

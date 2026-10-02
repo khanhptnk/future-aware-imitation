@@ -7,7 +7,8 @@ learned downstream can leak back to the root.
 
   reveal: the expert plays z everywhere. Root action 1 leads to downstream observations that reveal z (IDs 2 and 3);
           root action 0 leads to one downstream observation that still hides it (ID 1).
-  hard:   a correct root action enters an easy corridor (ID 1). The root mistake "action 1 when z = 0" enters a
+  hard:   z is the expert's own coin flip at the root (formally the same root as reveal). A correct root action enters
+          an easy corridor (ID 1). The root mistake "action 1 when z = 0" enters a
           recoverable corridor (ID 2), and the mistake "action 0 when z = 1" a hard one (ID 3). The expert plays action 0
           throughout the easy and recoverable corridors, and a fresh coin flip at every step of the hard one.
 

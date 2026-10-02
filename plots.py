@@ -74,7 +74,7 @@ def fig_summary(c, runs, distill, out, degree=1):
     style(ax, c)
     ax.grid(axis="x", visible=False)
     plt.rcParams["hatch.linewidth"] = 1.0
-    settings = ["privileged\ninformation", "partly random\nexpert", f"limited capacity\n(student degree {degree})"]
+    settings = ["privileged\ninformation", "stochastic\nexpert", f"limited capacity\n(student degree {degree})"]
     values = {m: [100 * np.mean([r["success"] for r in runs if r["env"] == env and r["method"] == m])
                   for env in ("reveal", "hard")] + [100 * distill["summary"][str(degree)][m]["success"][0]]
               for m in SUMMARY_METHODS}
@@ -126,7 +126,7 @@ DIAGRAMS = {
     "env": dict(root="root\nhides z", up="8 steps where z is visible", down="8 steps where z is still hidden",
                 up_label="action 1", down_label="action 0",
                 middle="either action matches\nthe expert half the time", right="the expert plays z at every step"),
-    "env-hard": dict(root="root\nhides z", up="z = 1: easy corridor\nz = 0: recoverable corridor",
+    "env-hard": dict(root="root: expert\nflips a coin z", up="z = 1: easy corridor\nz = 0: recoverable corridor",
                      down="z = 0: easy corridor\nz = 1: hard corridor (coin flips)", up_label="action 1",
                      down_label="action 0", middle="either action matches\nthe expert half the time",
                      right="downstream, the expert plays 0\nexcept in the hard corridor"),

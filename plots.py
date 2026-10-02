@@ -74,7 +74,7 @@ def fig_summary(c, runs, distill, out, degree=1):
     style(ax, c)
     ax.grid(axis="x", visible=False)
     plt.rcParams["hatch.linewidth"] = 1.0
-    settings = ["privileged\ninformation", "hard-to-imitate\nexpert", f"limited capacity\n(student degree {degree})"]
+    settings = ["privileged\ninformation", "partly random\nexpert", f"limited capacity\n(student degree {degree})"]
     values = {m: [100 * np.mean([r["success"] for r in runs if r["env"] == env and r["method"] == m])
                   for env in ("reveal", "hard")] + [100 * distill["summary"][str(degree)][m]["success"][0]]
               for m in SUMMARY_METHODS}

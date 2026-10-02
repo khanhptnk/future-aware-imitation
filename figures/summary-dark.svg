@@ -452,53 +452,49 @@ z
     <g id="xtick_2">
      <g id="line2d_2"/>
      <g id="text_2">
-      <!-- hard-to-imitate -->
-      <g style="fill: #ebebec" transform="translate(250.845 220.9) scale(0.1 -0.1)">
+      <!-- partly random -->
+      <g style="fill: #ebebec" transform="translate(256.445 220.9) scale(0.1 -0.1)">
        <defs>
-        <path id="UbuntuMono-Regular-4b" d="M 531 0 
-L 531 4877 
-L 1030 4966 
-L 1030 3258 
-Q 1197 3322 1382 3354 
-Q 1568 3386 1754 3386 
-Q 2266 3386 2554 3197 
-Q 2842 3008 2960 2665 
-Q 3078 2323 3078 1869 
-L 3078 0 
-L 2579 0 
-L 2579 1734 
-Q 2579 2182 2499 2441 
-Q 2419 2701 2230 2816 
-Q 2042 2931 1709 2931 
-Q 1510 2931 1312 2886 
-Q 1114 2842 1030 2810 
-L 1030 0 
-L 531 0 
+        <path id="UbuntuMono-Regular-5c" d="M 749 -1203 
+Q 646 -1203 489 -1168 
+Q 333 -1133 288 -1107 
+L 384 -704 
+Q 429 -730 547 -755 
+Q 666 -781 762 -781 
+Q 1139 -781 1347 -630 
+Q 1555 -480 1741 -96 
+Q 1312 704 953 1593 
+Q 595 2483 371 3315 
+L 934 3315 
+Q 1030 2931 1177 2454 
+Q 1325 1978 1520 1475 
+Q 1715 973 1939 512 
+Q 2118 992 2246 1424 
+Q 2374 1856 2492 2313 
+Q 2611 2771 2752 3315 
+L 3277 3315 
+Q 3059 2394 2771 1510 
+Q 2483 627 2176 -102 
+Q 2016 -486 1817 -729 
+Q 1619 -973 1360 -1088 
+Q 1101 -1203 749 -1203 
 z
 " transform="scale(0.015625)"/>
-        <path id="UbuntuMono-Regular-10" d="M 1062 1581 
-L 1062 2048 
-L 2522 2048 
-L 2522 1581 
-L 1062 1581 
-z
-" transform="scale(0.015625)"/>
+        <path id="UbuntuMono-Regular-3" transform="scale(0.015625)"/>
        </defs>
-       <use xlink:href="#UbuntuMono-Regular-4b"/>
+       <use xlink:href="#UbuntuMono-Regular-53"/>
        <use xlink:href="#UbuntuMono-Regular-44" transform="translate(56 0)"/>
        <use xlink:href="#UbuntuMono-Regular-55" transform="translate(112 0)"/>
-       <use xlink:href="#UbuntuMono-Regular-47" transform="translate(168 0)"/>
-       <use xlink:href="#UbuntuMono-Regular-10" transform="translate(224 0)"/>
-       <use xlink:href="#UbuntuMono-Regular-57" transform="translate(280 0)"/>
-       <use xlink:href="#UbuntuMono-Regular-52" transform="translate(336 0)"/>
-       <use xlink:href="#UbuntuMono-Regular-10" transform="translate(392 0)"/>
-       <use xlink:href="#UbuntuMono-Regular-4c" transform="translate(448 0)"/>
-       <use xlink:href="#UbuntuMono-Regular-50" transform="translate(504 0)"/>
-       <use xlink:href="#UbuntuMono-Regular-4c" transform="translate(560 0)"/>
-       <use xlink:href="#UbuntuMono-Regular-57" transform="translate(616 0)"/>
-       <use xlink:href="#UbuntuMono-Regular-44" transform="translate(672 0)"/>
-       <use xlink:href="#UbuntuMono-Regular-57" transform="translate(728 0)"/>
-       <use xlink:href="#UbuntuMono-Regular-48" transform="translate(784 0)"/>
+       <use xlink:href="#UbuntuMono-Regular-57" transform="translate(168 0)"/>
+       <use xlink:href="#UbuntuMono-Regular-4f" transform="translate(224 0)"/>
+       <use xlink:href="#UbuntuMono-Regular-5c" transform="translate(280 0)"/>
+       <use xlink:href="#UbuntuMono-Regular-3" transform="translate(336 0)"/>
+       <use xlink:href="#UbuntuMono-Regular-55" transform="translate(392 0)"/>
+       <use xlink:href="#UbuntuMono-Regular-44" transform="translate(448 0)"/>
+       <use xlink:href="#UbuntuMono-Regular-51" transform="translate(504 0)"/>
+       <use xlink:href="#UbuntuMono-Regular-47" transform="translate(560 0)"/>
+       <use xlink:href="#UbuntuMono-Regular-52" transform="translate(616 0)"/>
+       <use xlink:href="#UbuntuMono-Regular-50" transform="translate(672 0)"/>
       </g>
       <!-- expert -->
       <g style="fill: #ebebec" transform="translate(276.045 232.11) scale(0.1 -0.1)">
@@ -542,7 +538,6 @@ z
       <!-- limited capacity -->
       <g style="fill: #ebebec" transform="translate(407.910441 220.9) scale(0.1 -0.1)">
        <defs>
-        <path id="UbuntuMono-Regular-3" transform="scale(0.015625)"/>
         <path id="UbuntuMono-Regular-46" d="M 2131 -77 
 Q 1645 -77 1245 108 
 Q 845 294 605 675 
@@ -567,31 +562,6 @@ Q 2861 429 3130 525
 L 3200 102 
 Q 2938 0 2678 -38 
 Q 2419 -77 2131 -77 
-z
-" transform="scale(0.015625)"/>
-        <path id="UbuntuMono-Regular-5c" d="M 749 -1203 
-Q 646 -1203 489 -1168 
-Q 333 -1133 288 -1107 
-L 384 -704 
-Q 429 -730 547 -755 
-Q 666 -781 762 -781 
-Q 1139 -781 1347 -630 
-Q 1555 -480 1741 -96 
-Q 1312 704 953 1593 
-Q 595 2483 371 3315 
-L 934 3315 
-Q 1030 2931 1177 2454 
-Q 1325 1978 1520 1475 
-Q 1715 973 1939 512 
-Q 2118 992 2246 1424 
-Q 2374 1856 2492 2313 
-Q 2611 2771 2752 3315 
-L 3277 3315 
-Q 3059 2394 2771 1510 
-Q 2483 627 2176 -102 
-Q 2016 -486 1817 -729 
-Q 1619 -973 1360 -1088 
-Q 1101 -1203 749 -1203 
 z
 " transform="scale(0.015625)"/>
        </defs>
